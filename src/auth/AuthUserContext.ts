@@ -6,5 +6,6 @@ export interface AuthUser extends BaseAuthUser {
 }
 
 export function useAuthUser(): AuthUser {
-  return useSharedAuthUser<AuthUser>()
+  const user = useSharedAuthUser<AuthUser>()
+  return { ...user, isCmsAdmin: user.isCmsAdmin ?? true }
 }

@@ -15,9 +15,10 @@ interface ItemEditorProps {
   itemId: string
   contentTypeSlug: string
   onBack: () => void
+  onOpenHistory?: () => void
 }
 
-export function ItemEditor({ itemId, contentTypeSlug, onBack }: ItemEditorProps) {
+export function ItemEditor({ itemId, contentTypeSlug, onBack, onOpenHistory }: ItemEditorProps) {
   const authUser = useAuthUser()
   const [item, setItem] = useState<Record<string, unknown> | null>(null)
   const [schema, setSchema] = useState<FieldSchema[]>([])
@@ -77,6 +78,7 @@ export function ItemEditor({ itemId, contentTypeSlug, onBack }: ItemEditorProps)
         <div className="ml-auto flex items-center gap-1.5">
           <button
             type="button"
+            onClick={onOpenHistory}
             className="rounded-md border border-input p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
             title="Version history"
           >

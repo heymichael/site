@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Search, Plus, Settings, Calendar } from 'lucide-react'
+import { Search, Plus, Settings } from 'lucide-react'
 import { agentFetch } from '@haderach/shared-ui'
 import { useAuthUser } from '../auth/AuthUserContext'
 
@@ -32,9 +32,11 @@ interface ContentType {
 
 interface CollectionsListProps {
   onSelect: (id: string, slug: string) => void
+  onNewContentType?: () => void
+  onEditContentType?: (id: string) => void
 }
 
-export function CollectionsList({ onSelect }: CollectionsListProps) {
+export function CollectionsList({ onSelect, onNewContentType, onEditContentType }: CollectionsListProps) {
   const authUser = useAuthUser()
   const [contentTypes, setContentTypes] = useState<ContentType[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,6 +110,7 @@ export function CollectionsList({ onSelect }: CollectionsListProps) {
         </div>
         <button
           type="button"
+          onClick={onNewContentType}
           className="rounded-md border border-input p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
           title="New content type"
         >
@@ -136,11 +139,13 @@ export function CollectionsList({ onSelect }: CollectionsListProps) {
 
       <div className="flex flex-col gap-1">
         {filtered.map((ct) => (
-          <button
+          <div
             key={ct.id}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => onSelect(ct.id, ct.slug)}
-            className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 text-left hover:bg-accent transition-colors group"
+            onKeyDown={(e) => { if (e.key === 'Enter') onSelect(ct.id, ct.slug) }}
+            className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 text-left hover:bg-accent transition-colors group cursor-pointer"
           >
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-medium">{ct.label}</span>
@@ -156,10 +161,16 @@ export function CollectionsList({ onSelect }: CollectionsListProps) {
                   ))}
                 </div>
               )}
-              <Calendar className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" title="Add to schedule" />
-              <Settings className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" title="Manage content type" />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onEditContentType?.(ct.id) }}
+                className="rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground transition-all"
+                title="Manage content type"
+              >
+                <Settings className="h-3.5 w-3.5" />
+              </button>
             </div>
-          </button>
+          </div>
         ))}
         {filtered.length === 0 && (
           <div className="py-8 text-center text-sm text-muted-foreground">

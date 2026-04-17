@@ -87,10 +87,12 @@ export function App() {
             />
           }
           dataContent={
-            <CmsWorkPane
-              isCmsAdmin={authUser.isCmsAdmin}
-              onModeChange={handleModeChange}
-            />
+            <div className="flex flex-1 min-h-0 flex-col p-2">
+              <CmsWorkPane
+                isCmsAdmin={authUser.isCmsAdmin}
+                onModeChange={handleModeChange}
+              />
+            </div>
           }
         />
       </div>

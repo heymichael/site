@@ -33,11 +33,12 @@ interface ItemsListProps {
   collectionId: string
   collectionSlug: string
   onSelect: (id: string) => void
+  onSelectForApproval?: (id: string) => void
   onNew: () => void
   onBack: () => void
 }
 
-export function ItemsList({ collectionId, collectionSlug, onSelect, onNew, onBack }: ItemsListProps) {
+export function ItemsList({ collectionId, collectionSlug, onSelect, onSelectForApproval, onNew, onBack }: ItemsListProps) {
   const authUser = useAuthUser()
   const [items, setItems] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -150,7 +151,11 @@ export function ItemsList({ collectionId, collectionSlug, onSelect, onNew, onBac
               onChange={() => toggleSelect(item.id)}
               className="h-3.5 w-3.5 rounded border-input"
             />
-            <button type="button" onClick={() => onSelect(item.id)} className="flex flex-1 items-center justify-between text-left">
+            <button
+              type="button"
+              onClick={() => item.workflowStatus === 'needs_approval' && onSelectForApproval ? onSelectForApproval(item.id) : onSelect(item.id)}
+              className="flex flex-1 items-center justify-between text-left"
+            >
               <span className="text-sm font-medium">{item.title}</span>
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATE_COLORS[item.workflowStatus]}`}>
                 {STATE_LABELS[item.workflowStatus]}
