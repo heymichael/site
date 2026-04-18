@@ -1,0 +1,28 @@
+---
+description: App repo boundaries and documentation-first guardrails
+alwaysApply: true
+---
+
+# App Boundary Rule
+
+This repository is the CMS-driven public site app, integrated into the haderach platform control plane.
+
+- Keep strict separation of concerns:
+  - This repo owns the site SPA implementation, CI patterns, and artifact publish contracts.
+  - Platform orchestration, promotion, and cross-app routing checks remain outside this repo.
+  - Content collections and the Payload CMS service live in `../haderach-cms/`.
+  - Agent CMS proxy endpoints and tool handlers live in `../agent/service/`.
+- Keep app logic and app tests in this repository; do not add platform orchestration or backend logic here.
+- Keep naming kebab-case for repo/path conventions unless language-specific rules require otherwise.
+- Prefer explicit docs and small config contracts over heavy scripts or premature automation.
+- Use or update docs when behavior/contracts change:
+  - `README.md`
+  - `docs/architecture.md`
+  - app artifact contract docs/config
+  - keep repository ASCII trees in `README.md` and `docs/architecture.md` synchronized with actual repo structure
+- Preserve security/indexing defaults:
+  - default `noindex` / `nofollow`
+  - only allow indexing with explicit approval path documented
+- When adding new structure, keep it minimal and production-minded.
+- Follow todo lifecycle and formatting rules defined in:
+  - `.cursor/rules/todo-conventions.mdc`

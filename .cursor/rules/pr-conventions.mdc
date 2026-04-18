@@ -1,0 +1,20 @@
+---
+description: Pull request conventions for this repository
+alwaysApply: true
+---
+
+# PR conventions
+
+- Treat commit and PR as two explicit, separate user-driven phases.
+- Do not create a commit unless the user explicitly asks for a commit.
+- Before committing, summarize staged + unstaged changes and propose a commit message for user confirmation.
+- When creating pull requests, use `.github/pull_request_template.md`.
+- Fill every section. If not applicable, write `N/A` (do not leave sections blank).
+- Before any remote action, show the proposed PR title/body generated from current branch changes and template sections.
+- Require explicit user approval before `git push -u origin HEAD`.
+- After push output is confirmed, require a second explicit user approval before `gh pr create`.
+- Keep **Why** focused on the outcome/problem, not just file changes.
+- In **Todo Mapping**, reference relevant items from `../haderach-tasks/tasks/` with task ID and title.
+- In **Validation**, list only checks that were actually run.
+- In **Deploy / Ops Notes**, explicitly call out Firebase Hosting and any auth/secret implications.
+- Keep PRs small and single-purpose when possible.

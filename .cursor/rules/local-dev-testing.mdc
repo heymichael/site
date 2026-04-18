@@ -1,0 +1,15 @@
+---
+description: Local dev testing procedure — pointer to platform rule
+alwaysApply: true
+---
+
+# Local Dev Testing
+
+Follow the full procedure defined in `../haderach-platform/.cursor/rules/local-dev-testing.mdc`.
+
+This app runs on port **5177** and depends on:
+
+- **agent service** (port 8080) — chat backend and CMS proxy endpoints (`/agent/api/cms/**`)
+- **Payload CMS** (port 3000) — content read API (`/cms/api/**`), proxied via vite dev server
+
+UI-only changes (styling, layout) can run in bypass mode (`VITE_AUTH_BYPASS=true`). Backend-dependent changes (auth, content fetching, write workflow) require real auth mode and the agent service.
