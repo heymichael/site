@@ -86,7 +86,7 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [, setSaved] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set())
 
   useEffect(() => {

@@ -57,7 +57,7 @@ export function PermissionsMatrix() {
               email: d.email,
               contentTypeId: ct.id,
               contentTypeLabel: ct.label ?? ct.slug ?? ct.id,
-              roles: new Set((d.roles as string[]) ?? []),
+              roles: new Set((d.roles as CmsRole[]) ?? []),
             })
           }
         }

@@ -86,10 +86,10 @@ export function RichTextEditor({ value, onChange, editable = true }: RichTextEdi
     const newJson = typeof value === 'string' ? null : JSON.stringify(value)
     if (typeof value === 'string') {
       if (editor.getHTML() !== value) {
-        editor.commands.setContent(value, false)
+        editor.commands.setContent(value, { emitUpdate: false })
       }
     } else if (newJson && currentJson !== newJson) {
-      editor.commands.setContent(value, false)
+      editor.commands.setContent(value, { emitUpdate: false })
     }
   }, [value, editor])
 
