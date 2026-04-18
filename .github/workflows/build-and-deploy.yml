@@ -1,4 +1,4 @@
-name: build-and-deploy
+name: app-publish-artifact
 
 on:
   push:
@@ -10,28 +10,52 @@ permissions:
   contents: read
   id-token: write
 
-env:
-  IMAGE: us-central1-docker.pkg.dev/haderach-ai/haderach-apps/site-api
-  REGION: us-central1
-  SERVICE: site-api
-
 jobs:
-  build-deploy:
-    name: Build image and deploy to Cloud Run
+  publish-artifact:
+    name: Build and publish artifact
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout site repo
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          path: site
+          fetch-depth: 0
 
-      # shared-ui is a local file dependency (@haderach/shared-ui)
-      - name: Checkout haderach-home (shared-ui)
-        uses: actions/checkout@v4
+      - name: Clone haderach-home for shared-ui
+        run: git clone --depth 1 https://x-access-token:${{ secrets.CROSS_REPO_PAT }}@github.com/heymichael/haderach-home.git ../haderach-home
+
+      - name: Install haderach-home dependencies
+        run: npm install --prefix ../haderach-home
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          repository: heymichael/haderach-home
-          token: ${{ secrets.CROSS_REPO_PAT }}
-          path: haderach-home
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build runtime artifact
+        run: npm run build
+
+      - name: Package artifacts
+        run: bash scripts/package-artifacts.sh
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SHA=$(git rev-parse HEAD)
+          RUN="${{ github.run_number }}"
+          echo "semver=${VERSION}+build.${RUN}" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate manifest
+        run: |
+          node scripts/generate-manifest.mjs \
+            --bucket "${{ vars.GCS_ARTIFACT_BUCKET }}" \
+            --sha    "${{ steps.version.outputs.sha }}" \
+            --version "${{ steps.version.outputs.semver }}"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -42,39 +66,28 @@ jobs:
       - name: Setup gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-
-      - name: Build and push Docker image
+      - name: Upload versioned artifacts to GCS
         run: |
-          SHA=$(cd site && git rev-parse --short HEAD)
-          # Build context is workspace root so Dockerfile can reach both repos
-          docker build \
-            -f site/Dockerfile \
-            -t "$IMAGE:$SHA" \
-            -t "$IMAGE:latest" \
-            .
-          docker push "$IMAGE:$SHA"
-          docker push "$IMAGE:latest"
+          BUCKET="${{ vars.GCS_ARTIFACT_BUCKET }}"
+          SHA="${{ steps.version.outputs.sha }}"
+          PREFIX="gs://${BUCKET}/site/versions/${SHA}"
 
-      - name: Deploy to Cloud Run
-        run: |
-          SHA=$(cd site && git rev-parse --short HEAD)
-          gcloud run deploy "$SERVICE" \
-            --image "$IMAGE:$SHA" \
-            --region "$REGION" \
-            --project haderach-ai \
-            --quiet
+          gsutil -m cp \
+            artifacts/publish/runtime.tar.gz \
+            artifacts/publish/checksums.txt \
+            artifacts/publish/manifest.json \
+            "${PREFIX}/"
 
-      - name: Post-deploy smoke test
+          echo "Uploaded artifacts to ${PREFIX}/"
+
+      - name: Verify upload
         run: |
-          SERVICE_URL=$(gcloud run services describe "$SERVICE" \
-            --region "$REGION" --project haderach-ai \
-            --format='value(status.url)')
-          sleep 5
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health")
-          if [ "$HTTP_CODE" -ne 200 ]; then
-            echo "Smoke test failed: expected 200, got $HTTP_CODE"
-            exit 1
-          fi
-          echo "Smoke test passed: $SERVICE_URL/health returned $HTTP_CODE"
+          BUCKET="${{ vars.GCS_ARTIFACT_BUCKET }}"
+          SHA="${{ steps.version.outputs.sha }}"
+          PREFIX="gs://${BUCKET}/site/versions/${SHA}"
+
+          echo "Listing uploaded objects:"
+          gsutil ls "${PREFIX}/"
+
+          echo "Verifying manifest download:"
+          gsutil cat "${PREFIX}/manifest.json" | python3 -m json.tool
