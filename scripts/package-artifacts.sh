@@ -3,20 +3,21 @@
 # Run from repo root after `npm run build`.
 #
 # Outputs (under artifacts/publish/):
-#   runtime.tar.gz   – compressed dist/site/ directory contents
+#   runtime.tar.gz   – compressed dist/ directory (contains site/ subdir)
 #   checksums.txt    – sha256 checksum for the tarball
 #
-# Note: Vite outputs to dist/site/ (base: '/site/') so we tar from there.
+# Note: Vite outputs to dist/site/ (base: '/site/'). We tar from dist/ so the
+# tarball preserves the site/ prefix and extracts into hosting/public/site/.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-RUNTIME_SRC="$ROOT/dist/site"
+RUNTIME_SRC="$ROOT/dist"
 OUT_DIR="$ROOT/artifacts/publish"
 
-if [[ ! -d "$RUNTIME_SRC" ]]; then
-  echo "ERROR: Runtime build output not found at $RUNTIME_SRC — run 'npm run build' first."
+if [[ ! -d "$RUNTIME_SRC/site" ]]; then
+  echo "ERROR: Runtime build output not found at $RUNTIME_SRC/site — run 'npm run build' first."
   exit 1
 fi
 
