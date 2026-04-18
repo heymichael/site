@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
-import { ChevronLeft, Save, X, History, ArrowBigRight, Send, FilePlus2 } from 'lucide-react'
+import { ChevronLeft, Save, X, History, ArrowBigRight, Send, FilePlus2, MessageSquare } from 'lucide-react'
 import { useAuthUser } from '../auth/AuthUserContext'
 import { useConfirm } from '../components/ConfirmDialog'
 import { RichTextEditor } from '../components/RichTextEditor'
+import { isContentEmpty } from '../components/tiptapConfig'
+import type { JSONContent } from '@tiptap/react'
 
 function ToolbarBtn({ label, onClick, active, alwaysMuted, children }: {
   label: string
@@ -60,6 +62,12 @@ interface FieldSchema {
   guidelines?: string
 }
 
+interface SharedBlockDef {
+  role: string
+  label: string
+  field_type: string
+}
+
 interface ItemEditorProps {
   itemId: string
   contentTypeSlug: string
@@ -74,10 +82,12 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
   const confirm = useConfirm()
   const [item, setItem] = useState<Record<string, unknown> | null>(null)
   const [schema, setSchema] = useState<FieldSchema[]>([])
+  const [sharedBlockDefs, setSharedBlockDefs] = useState<SharedBlockDef[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let cancelled = false
@@ -95,6 +105,7 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
           if (ctResp.ok && !cancelled) {
             const ct = await ctResp.json()
             setSchema(ct.schema?.fields ?? ct.schema ?? [])
+            setSharedBlockDefs(ct.schema?.shared_blocks ?? [])
           }
         }
       } finally {
@@ -105,14 +116,36 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
     return () => { cancelled = true }
   }, [itemId, refreshKey])
 
-  const handleFieldChange = useCallback((fieldName: string, value: string) => {
+  const handleFieldChange = useCallback((fieldName: string, value: unknown) => {
     setItem((prev) => prev ? { ...prev, data: { ...((prev.data as Record<string, unknown>) ?? {}), [fieldName]: value } } : prev)
     setDirty(true)
     setSaved(false)
+    setValidationErrors((prev) => {
+      if (!prev.has(fieldName)) return prev
+      const next = new Set(prev)
+      next.delete(fieldName)
+      return next
+    })
   }, [])
 
   const handleSave = useCallback(async () => {
     if (!item || !dirty) return
+    const data = (item.data as Record<string, unknown>) ?? {}
+    const itemRole = data.role as string | undefined
+
+    if (!itemRole) {
+      const missing = new Set<string>()
+      for (const field of schema) {
+        if (field.required && isContentEmpty(data[field.name])) {
+          missing.add(field.name)
+        }
+      }
+      if (missing.size > 0) {
+        setValidationErrors(missing)
+        return
+      }
+    }
+
     setSaving(true)
     try {
       const token = await authUser.getIdToken()
@@ -124,10 +157,11 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
       if (!resp.ok) throw new Error(`Save failed: ${resp.status}`)
       setDirty(false)
       setSaved(true)
+      setValidationErrors(new Set())
     } finally {
       setSaving(false)
     }
-  }, [item, dirty, itemId, authUser])
+  }, [item, dirty, itemId, authUser, schema])
 
   const handleClose = useCallback(async () => {
     if (dirty) {
@@ -213,11 +247,18 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
   }
 
   const itemData = (item.data as Record<string, unknown>) ?? {}
+  const itemRole = itemData.role as string | undefined
   const workflowStatus = (item.workflow_status as string) ?? 'draft'
   const editable = workflowStatus === 'draft' || workflowStatus === 'changes_requested'
   const canSubmit = editable
   const canPublish = workflowStatus === 'approved'
   const canNewVersion = workflowStatus === 'live'
+  const workflowComment = (item.workflow_comment as string) ?? ''
+
+  const sharedBlockDef = itemRole
+    ? sharedBlockDefs.find((b) => b.role === itemRole)
+    : undefined
+  const breadcrumbLabel = sharedBlockDef?.label ?? (itemData.title as string) ?? itemId.slice(0, 8)
 
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -228,7 +269,7 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
         <button type="button" onClick={handleClose} className="text-sm font-medium hover:underline">
           {contentTypeName ?? contentTypeSlug}
         </button>
-        <span className="text-xs text-muted-foreground">/ {(itemData.title as string) ?? itemId.slice(0, 8)}</span>
+        <span className="text-xs text-muted-foreground">/ {breadcrumbLabel}</span>
 
         <div className="ml-auto flex items-center gap-1.5">
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_COLORS[workflowStatus] ?? 'bg-gray-100 text-gray-700'}`}>
@@ -255,52 +296,75 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
         </div>
       </div>
 
+      {workflowStatus === 'changes_requested' && workflowComment && (
+        <div className="mx-1 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+          <MessageSquare className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-red-600" />
+          <div className="text-sm text-red-800">{workflowComment}</div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 px-1">
-        {schema.map((field) => (
-          <div key={field.name} className="grid grid-cols-[8rem_1fr] items-start gap-3">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2 text-right">
-              {field.name}
-              {field.required && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
-            {field.type === 'richtext' ? (
-              <RichTextEditor
-                value={(itemData[field.name] as string) ?? ''}
-                onChange={(html) => handleFieldChange(field.name, html)}
-                editable={editable}
-              />
-            ) : field.type === 'textarea' ? (
-              editable ? (
-                <textarea
-                  value={(itemData[field.name] as string) ?? ''}
-                  onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                  rows={4}
-                  className="rounded-md border border-input bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"
-                />
-              ) : (
-                <div className="rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm whitespace-pre-wrap min-h-[6rem]">
-                  {(itemData[field.name] as string) ?? ''}
+        {itemRole ? (
+          <RichTextEditor
+            value={(itemData.body as JSONContent | string) ?? ''}
+            onChange={(json) => handleFieldChange('body', json)}
+            editable={editable}
+          />
+        ) : (
+          <>
+            {schema.map((field) => {
+              const hasError = validationErrors.has(field.name)
+              const errorBorder = hasError ? 'border-red-400 ring-1 ring-red-400' : ''
+              return (
+                <div key={field.name} className="grid grid-cols-[8rem_1fr] items-start gap-3">
+                  <label className={`text-xs font-medium uppercase tracking-wide pt-2 text-right ${hasError ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    {field.name}
+                    {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                  </label>
+                  {field.type === 'richtext' ? (
+                    <div className={hasError ? 'rounded-md ring-1 ring-red-400' : ''}>
+                      <RichTextEditor
+                        value={(itemData[field.name] as JSONContent | string) ?? ''}
+                        onChange={(json) => handleFieldChange(field.name, json)}
+                        editable={editable}
+                      />
+                    </div>
+                  ) : field.type === 'textarea' ? (
+                    editable ? (
+                      <textarea
+                        value={(itemData[field.name] as string) ?? ''}
+                        onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                        rows={4}
+                        className={`rounded-md border border-input bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y ${errorBorder}`}
+                      />
+                    ) : (
+                      <div className="rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm whitespace-pre-wrap min-h-[6rem]">
+                        {(itemData[field.name] as string) ?? ''}
+                      </div>
+                    )
+                  ) : (
+                    editable ? (
+                      <input
+                        type="text"
+                        value={(itemData[field.name] as string) ?? ''}
+                        onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                        className={`rounded-md border border-input bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${errorBorder}`}
+                      />
+                    ) : (
+                      <div className="rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm">
+                        {(itemData[field.name] as string) ?? ''}
+                      </div>
+                    )
+                  )}
                 </div>
               )
-            ) : (
-              editable ? (
-                <input
-                  type="text"
-                  value={(itemData[field.name] as string) ?? ''}
-                  onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                  className="rounded-md border border-input bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              ) : (
-                <div className="rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm">
-                  {(itemData[field.name] as string) ?? ''}
-                </div>
-              )
+            })}
+            {schema.length === 0 && (
+              <div className="py-4 text-sm text-muted-foreground italic">
+                No schema defined for this content type.
+              </div>
             )}
-          </div>
-        ))}
-        {schema.length === 0 && (
-          <div className="py-4 text-sm text-muted-foreground italic">
-            No schema defined for this content type.
-          </div>
+          </>
         )}
       </div>
     </div>

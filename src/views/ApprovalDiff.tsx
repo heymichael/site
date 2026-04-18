@@ -1,11 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, Check, MessageSquare } from 'lucide-react'
 import { useAuthUser } from '../auth/AuthUserContext'
+import { renderContentToHtml } from '../components/tiptapConfig'
 
 interface FieldSchema {
   name: string
   type: string
   ui: 'inline-form' | 'chat'
+}
+
+interface SharedBlockDef {
+  role: string
+  label: string
+  field_type: string
 }
 
 interface ApprovalDiffProps {
@@ -20,8 +27,9 @@ interface ApprovalDiffProps {
 export function ApprovalDiff({ itemId, contentTypeSlug, contentTypeName, onBack, onBackToList, onActionComplete }: ApprovalDiffProps) {
   const authUser = useAuthUser()
   const [currentData, setCurrentData] = useState<Record<string, unknown>>({})
-  const [publishedData, setPublishedData] = useState<Record<string, unknown>>({})
+  const [publishedData, setPublishedData] = useState<Record<string, unknown> | null>(null)
   const [schema, setSchema] = useState<FieldSchema[]>([])
+  const [sharedBlockDefs, setSharedBlockDefs] = useState<SharedBlockDef[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [showCommentInput, setShowCommentInput] = useState(false)
@@ -47,7 +55,7 @@ export function ApprovalDiff({ itemId, contentTypeSlug, contentTypeName, onBack,
           const lastPublished = allVersions.find(
             (v: Record<string, unknown>) => v.status === 'published'
           )
-          setPublishedData((lastPublished?.data as Record<string, unknown>) ?? {})
+          setPublishedData(lastPublished ? ((lastPublished.data as Record<string, unknown>) ?? {}) : null)
         }
 
         const ctId = typeof item.contentType === 'object' ? item.contentType.id : item.contentType
@@ -57,6 +65,7 @@ export function ApprovalDiff({ itemId, contentTypeSlug, contentTypeName, onBack,
             const ct = await ctResp.json()
             const rawSchema = ct.schema
             setSchema((typeof rawSchema === 'object' && rawSchema?.fields ? rawSchema.fields : rawSchema) ?? [])
+            setSharedBlockDefs(rawSchema?.shared_blocks ?? [])
           }
         }
       } finally {
@@ -165,45 +174,91 @@ export function ApprovalDiff({ itemId, contentTypeSlug, contentTypeName, onBack,
       )}
 
       <div className="flex flex-col gap-4 px-1">
-        <div className="grid grid-cols-[8rem_1fr_1fr] gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b pb-1">
-          <span />
-          <span>Published (before)</span>
-          <span>Current draft (after)</span>
-        </div>
-        {schema.map((field) => {
-          const before = String(publishedData[field.name] ?? '')
-          const after = String(currentData[field.name] ?? '')
-          const changed = before !== after
+        {publishedData ? (
+          <div className="grid grid-cols-[8rem_1fr_1fr] gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b pb-1">
+            <span />
+            <span>Published (before)</span>
+            <span>Current draft (after)</span>
+          </div>
+        ) : (
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            New item — no previously published version.
+          </div>
+        )}
+        {currentData.role ? (() => {
+          const beforeRaw = publishedData ? publishedData.body : null
+          const afterRaw = currentData.body
+          const before = beforeRaw !== null ? renderContentToHtml(beforeRaw as string | Record<string, unknown>) : null
+          const after = renderContentToHtml(afterRaw as string | Record<string, unknown>)
+          const changed = before !== null && before !== after
+          const blockDef = sharedBlockDefs.find((b) => b.role === currentData.role)
           return (
-            <div key={field.name} className="grid grid-cols-[8rem_1fr_1fr] items-start gap-3">
+            <div className={`grid items-start gap-3 ${before !== null ? 'grid-cols-[8rem_1fr_1fr]' : 'grid-cols-[8rem_1fr]'}`}>
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2 text-right">
-                {field.name}
+                {blockDef?.label ?? 'Content'}
               </label>
-              {field.type === 'richtext' ? (
+              {before !== null && (
                 <div
                   className={`rounded-md border px-3 py-2 text-sm prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_p]:my-1 [&_a]:text-primary [&_a]:underline ${changed ? 'border-red-200 bg-red-50 text-red-900' : 'border-border bg-muted/30'}`}
                   dangerouslySetInnerHTML={{ __html: before || '<span class="italic text-muted-foreground">empty</span>' }}
                 />
-              ) : (
-                <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-red-200 bg-red-50 text-red-900' : 'border-border bg-muted/30'}`}>
-                  {before || <span className="italic text-muted-foreground">empty</span>}
-                </div>
               )}
-              {field.type === 'richtext' ? (
-                <div
-                  className={`rounded-md border px-3 py-2 text-sm prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_p]:my-1 [&_a]:text-primary [&_a]:underline ${changed ? 'border-green-200 bg-green-50 text-green-900' : 'border-border bg-muted/30'}`}
-                  dangerouslySetInnerHTML={{ __html: after || '<span class="italic text-muted-foreground">empty</span>' }}
-                />
-              ) : (
-                <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-green-200 bg-green-50 text-green-900' : 'border-border bg-muted/30'}`}>
-                  {after || <span className="italic text-muted-foreground">empty</span>}
-                </div>
-              )}
+              <div
+                className={`rounded-md border px-3 py-2 text-sm prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_p]:my-1 [&_a]:text-primary [&_a]:underline ${changed ? 'border-green-200 bg-green-50 text-green-900' : 'border-green-200 bg-green-50 text-green-900'}`}
+                dangerouslySetInnerHTML={{ __html: after || '<span class="italic text-muted-foreground">empty</span>' }}
+              />
             </div>
           )
-        })}
-        {schema.length === 0 && (
-          <div className="py-4 text-sm text-muted-foreground italic">No schema defined.</div>
+        })() : (
+          <>
+            {schema.map((field) => {
+              const isRichtext = field.type === 'richtext'
+              const beforeRaw = publishedData ? publishedData[field.name] : undefined
+              const afterRaw = currentData[field.name]
+              const before = publishedData
+                ? (isRichtext
+                    ? renderContentToHtml(beforeRaw as string | Record<string, unknown>)
+                    : String(beforeRaw ?? ''))
+                : null
+              const after = isRichtext
+                ? renderContentToHtml(afterRaw as string | Record<string, unknown>)
+                : String(afterRaw ?? '')
+              const changed = before !== null && before !== after
+              const isNew = before === null
+              return (
+                <div key={field.name} className={`grid items-start gap-3 ${before !== null ? 'grid-cols-[8rem_1fr_1fr]' : 'grid-cols-[8rem_1fr]'}`}>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2 text-right">
+                    {field.name}
+                  </label>
+                  {before !== null && (
+                    isRichtext ? (
+                      <div
+                        className={`rounded-md border px-3 py-2 text-sm prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_p]:my-1 [&_a]:text-primary [&_a]:underline ${changed ? 'border-red-200 bg-red-50 text-red-900' : 'border-border bg-muted/30'}`}
+                        dangerouslySetInnerHTML={{ __html: before || '<span class="italic text-muted-foreground">empty</span>' }}
+                      />
+                    ) : (
+                      <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-red-200 bg-red-50 text-red-900' : 'border-border bg-muted/30'}`}>
+                        {before || <span className="italic text-muted-foreground">empty</span>}
+                      </div>
+                    )
+                  )}
+                  {isRichtext ? (
+                    <div
+                      className={`rounded-md border px-3 py-2 text-sm prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_p]:my-1 [&_a]:text-primary [&_a]:underline ${changed || isNew ? 'border-green-200 bg-green-50 text-green-900' : 'border-border bg-muted/30'}`}
+                      dangerouslySetInnerHTML={{ __html: after || '<span class="italic text-muted-foreground">empty</span>' }}
+                    />
+                  ) : (
+                    <div className={`rounded-md border px-3 py-2 text-sm ${changed || isNew ? 'border-green-200 bg-green-50 text-green-900' : 'border-border bg-muted/30'}`}>
+                      {after || <span className="italic text-muted-foreground">empty</span>}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {schema.length === 0 && (
+              <div className="py-4 text-sm text-muted-foreground italic">No schema defined.</div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, RotateCcw } from 'lucide-react'
 import { useAuthUser } from '../auth/AuthUserContext'
+import { renderContentToHtml } from '../components/tiptapConfig'
 
 interface FieldSchema {
   name: string
@@ -146,7 +147,7 @@ export function VersionHistory({ itemId, contentTypeSlug, contentTypeName, onBac
               {field.type === 'richtext' ? (
                 <div
                   className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm min-h-[6rem] prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_blockquote]:border-l-2 [&_blockquote]:border-muted-foreground/30 [&_blockquote]:pl-3 [&_blockquote]:italic [&_p]:my-1 [&_a]:text-primary [&_a]:underline"
-                  dangerouslySetInnerHTML={{ __html: String(selectedVersion.data[field.name] ?? '') }}
+                  dangerouslySetInnerHTML={{ __html: renderContentToHtml(selectedVersion.data[field.name] as string | Record<string, unknown>) }}
                 />
               ) : field.type === 'textarea' ? (
                 <div className="rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm whitespace-pre-wrap min-h-[6rem]">

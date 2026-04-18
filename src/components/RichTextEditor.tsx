@@ -1,15 +1,15 @@
 import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Link from '@tiptap/extension-link'
-import { useEffect, useCallback } from 'react'
+import type { JSONContent } from '@tiptap/react'
+import { useEffect, useCallback, useRef } from 'react'
 import {
   Bold, Italic, List, ListOrdered, Heading2, Link as LinkIcon,
   Quote, Undo, Redo,
 } from 'lucide-react'
+import { tiptapExtensions, renderContentToHtml } from './tiptapConfig'
 
 interface RichTextEditorProps {
-  value: string
-  onChange: (html: string) => void
+  value: JSONContent | string
+  onChange: (json: JSONContent) => void
   editable?: boolean
 }
 
@@ -50,20 +50,17 @@ function ToolbarButton({
 }
 
 export function RichTextEditor({ value, onChange, editable = true }: RichTextEditorProps) {
+  const ready = useRef(false)
+
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [2, 3] },
-      }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: { class: 'text-primary underline' },
-      }),
-    ],
+    extensions: tiptapExtensions,
     content: value,
     editable,
+    onCreate: () => {
+      requestAnimationFrame(() => { ready.current = true })
+    },
     onUpdate: ({ editor: e }) => {
-      onChange(e.getHTML())
+      if (ready.current && e.isEditable) onChange(e.getJSON())
     },
     editorProps: {
       attributes: {
@@ -84,7 +81,14 @@ export function RichTextEditor({ value, onChange, editable = true }: RichTextEdi
   })
 
   useEffect(() => {
-    if (editor && editor.getHTML() !== value) {
+    if (!editor) return
+    const currentJson = JSON.stringify(editor.getJSON())
+    const newJson = typeof value === 'string' ? null : JSON.stringify(value)
+    if (typeof value === 'string') {
+      if (editor.getHTML() !== value) {
+        editor.commands.setContent(value, false)
+      }
+    } else if (newJson && currentJson !== newJson) {
       editor.commands.setContent(value, false)
     }
   }, [value, editor])
@@ -110,10 +114,11 @@ export function RichTextEditor({ value, onChange, editable = true }: RichTextEdi
   if (!editor) return null
 
   if (!editable) {
+    const html = renderContentToHtml(value)
     return (
       <div
         className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm min-h-[8rem] prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_blockquote]:border-l-2 [&_blockquote]:border-muted-foreground/30 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_p]:my-1 [&_a]:text-primary [&_a]:underline"
-        dangerouslySetInnerHTML={{ __html: value }}
+        dangerouslySetInnerHTML={{ __html: html }}
       />
     )
   }
