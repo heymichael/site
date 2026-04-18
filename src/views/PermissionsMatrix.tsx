@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Save, Loader2 } from 'lucide-react'
-import { agentFetch } from '@haderach/shared-ui'
 import { useAuthUser } from '../auth/AuthUserContext'
 
 const CMS_ROLES = ['editor', 'approver', 'publisher', 'admin'] as const
@@ -33,8 +32,8 @@ export function PermissionsMatrix() {
     async function load() {
       try {
         const [ctResp, rolesResp] = await Promise.all([
-          agentFetch('/cms/api/content-types?where[status][equals]=committed&limit=100', authUser.getIdToken),
-          agentFetch('/cms/api/cms-roles?limit=500&depth=1', authUser.getIdToken),
+          fetch('/cms/api/content-types?where[status][equals]=committed&limit=100'),
+          fetch('/cms/api/cms-roles?limit=500&depth=1'),
         ])
 
         if (cancelled) return
@@ -95,19 +94,21 @@ export function PermissionsMatrix() {
   const handleSave = useCallback(async () => {
     setSaving(true)
     try {
+      const token = await authUser.getIdToken()
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       for (const a of assignments) {
         if (a.roles.size === 0 && a.id) {
-          await agentFetch(`/cms/api/cms-roles/${a.id}`, authUser.getIdToken, { method: 'DELETE' })
+          await fetch(`/cms/api/cms-roles/${a.id}`, { method: 'DELETE', headers })
         } else if (a.id) {
-          await agentFetch(`/cms/api/cms-roles/${a.id}`, authUser.getIdToken, {
+          await fetch(`/cms/api/cms-roles/${a.id}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ roles: [...a.roles] }),
           })
         } else if (a.roles.size > 0) {
-          await agentFetch('/cms/api/cms-roles', authUser.getIdToken, {
+          await fetch('/cms/api/cms-roles', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ email: a.email, contentType: a.contentTypeId, roles: [...a.roles] }),
           })
         }

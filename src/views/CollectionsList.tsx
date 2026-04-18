@@ -1,16 +1,15 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Search, Plus, Settings } from 'lucide-react'
-import { agentFetch } from '@haderach/shared-ui'
-import { useAuthUser } from '../auth/AuthUserContext'
 
-const WORKFLOW_STATES = ['draft', 'needs_approval', 'changes_requested', 'pending', 'live'] as const
+const WORKFLOW_STATES = ['draft', 'needs_approval', 'changes_requested', 'approved', 'scheduled', 'live'] as const
 type WorkflowState = typeof WORKFLOW_STATES[number]
 
 const STATE_COLORS: Record<WorkflowState, string> = {
   draft: 'bg-gray-100 text-gray-700',
   needs_approval: 'bg-amber-100 text-amber-800',
   changes_requested: 'bg-red-100 text-red-800',
-  pending: 'bg-blue-100 text-blue-800',
+  approved: 'bg-purple-100 text-purple-800',
+  scheduled: 'bg-blue-100 text-blue-800',
   live: 'bg-green-100 text-green-800',
 }
 
@@ -18,7 +17,8 @@ const STATE_LABELS: Record<WorkflowState, string> = {
   draft: 'Draft',
   needs_approval: 'Needs Approval',
   changes_requested: 'Changes Requested',
-  pending: 'Pending',
+  approved: 'Approved',
+  scheduled: 'Scheduled',
   live: 'Live',
 }
 
@@ -31,13 +31,12 @@ interface ContentType {
 }
 
 interface CollectionsListProps {
-  onSelect: (id: string, slug: string) => void
+  onSelect: (id: string, slug: string, name: string) => void
   onNewContentType?: () => void
   onEditContentType?: (id: string) => void
 }
 
 export function CollectionsList({ onSelect, onNewContentType, onEditContentType }: CollectionsListProps) {
-  const authUser = useAuthUser()
   const [contentTypes, setContentTypes] = useState<ContentType[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -47,7 +46,7 @@ export function CollectionsList({ onSelect, onNewContentType, onEditContentType 
     let cancelled = false
     async function load() {
       try {
-        const resp = await agentFetch('/cms/api/content-types?depth=0&limit=100', authUser.getIdToken)
+        const resp = await fetch('/cms/api/content-types?depth=0&limit=100')
         if (!resp.ok) return
         const data = await resp.json()
         if (cancelled) return
@@ -56,10 +55,27 @@ export function CollectionsList({ onSelect, onNewContentType, onEditContentType 
           .map((d: Record<string, unknown>) => ({
             id: d.id as string,
             slug: d.slug as string,
-            label: (d.label as string) ?? (d.slug as string),
+            label: (d.name as string) ?? (d.slug as string),
             status: d.status as 'draft' | 'committed',
             itemStates: [] as WorkflowState[],
           }))
+
+        const itemsResp = await fetch('/cms/api/content-items?depth=0&limit=500')
+        if (itemsResp.ok && !cancelled) {
+          const itemsData = await itemsResp.json()
+          const statesByType = new Map<string, Set<WorkflowState>>()
+          for (const item of itemsData.docs ?? []) {
+            const rawCtId = typeof item.contentType === 'object' ? item.contentType.id : item.contentType
+            const ctId = String(rawCtId)
+            const ws = (item.workflow_status as WorkflowState) ?? 'draft'
+            if (!statesByType.has(ctId)) statesByType.set(ctId, new Set())
+            statesByType.get(ctId)!.add(ws)
+          }
+          for (const ct of types) {
+            ct.itemStates = [...(statesByType.get(String(ct.id)) ?? [])]
+          }
+        }
+
         setContentTypes(types)
       } finally {
         if (!cancelled) setLoading(false)
@@ -67,7 +83,7 @@ export function CollectionsList({ onSelect, onNewContentType, onEditContentType 
     }
     load()
     return () => { cancelled = true }
-  }, [authUser.getIdToken])
+  }, [])
 
   const toggleFilter = useCallback((state: WorkflowState) => {
     setActiveFilters((prev) => {
@@ -143,14 +159,11 @@ export function CollectionsList({ onSelect, onNewContentType, onEditContentType 
             key={ct.id}
             role="button"
             tabIndex={0}
-            onClick={() => onSelect(ct.id, ct.slug)}
-            onKeyDown={(e) => { if (e.key === 'Enter') onSelect(ct.id, ct.slug) }}
+            onClick={() => onSelect(ct.id, ct.slug, ct.label)}
+            onKeyDown={(e) => { if (e.key === 'Enter') onSelect(ct.id, ct.slug, ct.label) }}
             className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 text-left hover:bg-accent transition-colors group cursor-pointer"
           >
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium">{ct.label}</span>
-              <span className="text-xs text-muted-foreground">{ct.slug}</span>
-            </div>
+            <span className="text-sm font-medium">{ct.label}</span>
             <div className="flex items-center gap-1.5">
               {ct.itemStates.length > 0 && (
                 <div className="flex gap-1">

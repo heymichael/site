@@ -1,16 +1,16 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ChevronLeft, Plus } from 'lucide-react'
-import { agentFetch } from '@haderach/shared-ui'
 import { useAuthUser } from '../auth/AuthUserContext'
 
-const WORKFLOW_STATES = ['draft', 'needs_approval', 'changes_requested', 'pending', 'live'] as const
+const WORKFLOW_STATES = ['draft', 'needs_approval', 'changes_requested', 'approved', 'scheduled', 'live'] as const
 type WorkflowState = typeof WORKFLOW_STATES[number]
 
 const STATE_COLORS: Record<WorkflowState, string> = {
   draft: 'bg-gray-100 text-gray-700',
   needs_approval: 'bg-amber-100 text-amber-800',
   changes_requested: 'bg-red-100 text-red-800',
-  pending: 'bg-blue-100 text-blue-800',
+  approved: 'bg-purple-100 text-purple-800',
+  scheduled: 'bg-blue-100 text-blue-800',
   live: 'bg-green-100 text-green-800',
 }
 
@@ -18,7 +18,8 @@ const STATE_LABELS: Record<WorkflowState, string> = {
   draft: 'Draft',
   needs_approval: 'Needs Approval',
   changes_requested: 'Changes Requested',
-  pending: 'Pending',
+  approved: 'Approved',
+  scheduled: 'Scheduled',
   live: 'Live',
 }
 
@@ -32,16 +33,18 @@ interface ContentItem {
 interface ItemsListProps {
   collectionId: string
   collectionSlug: string
+  collectionName: string
   onSelect: (id: string) => void
   onSelectForApproval?: (id: string) => void
   onNew: () => void
   onBack: () => void
 }
 
-export function ItemsList({ collectionId, collectionSlug, onSelect, onSelectForApproval, onNew, onBack }: ItemsListProps) {
+export function ItemsList({ collectionId, collectionSlug, collectionName, onSelect, onSelectForApproval, onNew, onBack }: ItemsListProps) {
   const authUser = useAuthUser()
   const [items, setItems] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
   const [activeFilters, setActiveFilters] = useState<Set<WorkflowState>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -49,17 +52,16 @@ export function ItemsList({ collectionId, collectionSlug, onSelect, onSelectForA
     let cancelled = false
     async function load() {
       try {
-        const resp = await agentFetch(
+        const resp = await fetch(
           `/cms/api/content-items?where[contentType][equals]=${collectionId}&limit=200&sort=-updatedAt`,
-          authUser.getIdToken,
         )
         if (!resp.ok) return
         const data = await resp.json()
         if (cancelled) return
         const docs: ContentItem[] = (data.docs ?? []).map((d: Record<string, unknown>) => ({
           id: d.id as string,
-          title: (d.title as string) ?? ((d.data as Record<string, unknown>)?.title as string) ?? `Item ${(d.id as string).slice(0, 6)}`,
-          workflowStatus: ((d.workflow_status as string) ?? (d._status === 'published' ? 'live' : 'draft')) as WorkflowState,
+          title: ((d.data as Record<string, unknown>)?.title as string) ?? (d.slug as string) ?? `Item ${d.id}`,
+          workflowStatus: ((d.workflow_status as string) ?? 'draft') as WorkflowState,
           updatedAt: d.updatedAt as string,
         }))
         setItems(docs)
@@ -69,7 +71,27 @@ export function ItemsList({ collectionId, collectionSlug, onSelect, onSelectForA
     }
     load()
     return () => { cancelled = true }
-  }, [collectionId, authUser.getIdToken])
+  }, [collectionId])
+
+  const handleCreate = useCallback(async () => {
+    setCreating(true)
+    try {
+      const token = await authUser.getIdToken()
+      const resp = await fetch('/agent/api/cms/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contentTypeId: collectionId, data: { title: 'Untitled' } }),
+      })
+      if (!resp.ok) throw new Error(`Create failed: ${resp.status}`)
+      const result = await resp.json()
+      const newId = result.item?.id ?? result.id
+      if (newId) onSelect(String(newId))
+    } catch (e) {
+      console.error('Failed to create item:', e)
+    } finally {
+      setCreating(false)
+    }
+  }, [authUser, collectionId, onSelect])
 
   const toggleFilter = useCallback((state: WorkflowState) => {
     setActiveFilters((prev) => {
@@ -94,8 +116,8 @@ export function ItemsList({ collectionId, collectionSlug, onSelect, onSelectForA
     return items.filter((item) => activeFilters.has(item.workflowStatus))
   }, [items, activeFilters])
 
-  const pendingSelected = useMemo(
-    () => [...selected].filter((id) => items.find((i) => i.id === id)?.workflowStatus === 'pending'),
+  const approvedSelected = useMemo(
+    () => [...selected].filter((id) => items.find((i) => i.id === id)?.workflowStatus === 'approved'),
     [selected, items],
   )
 
@@ -109,17 +131,23 @@ export function ItemsList({ collectionId, collectionSlug, onSelect, onSelectForA
         <button type="button" onClick={onBack} className="rounded p-1 hover:bg-accent transition-colors">
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="text-sm font-medium">{collectionSlug}</span>
+        <span className="text-sm font-medium">{collectionName}</span>
         <div className="ml-auto flex items-center gap-1.5">
-          {pendingSelected.length > 0 && (
+          {approvedSelected.length > 0 && (
             <button
               type="button"
               className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
-              Publish {pendingSelected.length} selected
+              Publish {approvedSelected.length} selected
             </button>
           )}
-          <button type="button" onClick={onNew} className="rounded-md border border-input p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={creating}
+            className="rounded-md border border-input p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50"
+            title="New item"
+          >
             <Plus className="h-4 w-4" />
           </button>
         </div>

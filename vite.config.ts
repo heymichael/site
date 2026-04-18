@@ -73,7 +73,7 @@ export default defineConfig({
       },
       '/cms/api': {
         target: 'http://localhost:3000',
-        rewrite: (path) => path,
+        rewrite: (path) => path.replace(/^\/cms/, ''),
       },
     },
   },

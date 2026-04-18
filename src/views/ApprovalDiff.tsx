@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, Check, MessageSquare } from 'lucide-react'
-import { agentFetch } from '@haderach/shared-ui'
 import { useAuthUser } from '../auth/AuthUserContext'
 
 interface FieldSchema {
@@ -12,11 +11,13 @@ interface FieldSchema {
 interface ApprovalDiffProps {
   itemId: string
   contentTypeSlug: string
+  contentTypeName?: string
   onBack: () => void
+  onBackToList: () => void
   onActionComplete: () => void
 }
 
-export function ApprovalDiff({ itemId, contentTypeSlug, onBack, onActionComplete }: ApprovalDiffProps) {
+export function ApprovalDiff({ itemId, contentTypeSlug, contentTypeName, onBack, onBackToList, onActionComplete }: ApprovalDiffProps) {
   const authUser = useAuthUser()
   const [currentData, setCurrentData] = useState<Record<string, unknown>>({})
   const [publishedData, setPublishedData] = useState<Record<string, unknown>>({})
@@ -30,27 +31,32 @@ export function ApprovalDiff({ itemId, contentTypeSlug, onBack, onActionComplete
     let cancelled = false
     async function load() {
       try {
-        const resp = await agentFetch(`/cms/api/content-items/${itemId}?depth=1&draft=true`, authUser.getIdToken)
+        const token = await authUser.getIdToken()
+
+        const resp = await fetch(`/cms/api/content-items/${itemId}?depth=1&draft=true`)
         if (!resp.ok || cancelled) return
         const item = await resp.json()
         setCurrentData((item.data as Record<string, unknown>) ?? {})
 
-        const versionsResp = await agentFetch(
-          `/cms/api/content-items/${itemId}/versions?where[version.status][equals]=published&limit=1&sort=-updatedAt`,
-          authUser.getIdToken,
-        )
+        const versionsResp = await fetch(`/agent/api/cms/items/${itemId}/versions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         if (versionsResp.ok && !cancelled) {
           const versionsData = await versionsResp.json()
-          const lastPublished = versionsData.docs?.[0]?.version
+          const allVersions = versionsData.docs ?? []
+          const lastPublished = allVersions.find(
+            (v: Record<string, unknown>) => v.status === 'published'
+          )
           setPublishedData((lastPublished?.data as Record<string, unknown>) ?? {})
         }
 
         const ctId = typeof item.contentType === 'object' ? item.contentType.id : item.contentType
         if (ctId) {
-          const ctResp = await agentFetch(`/cms/api/content-types/${ctId}`, authUser.getIdToken)
+          const ctResp = await fetch(`/cms/api/content-types/${ctId}`)
           if (ctResp.ok && !cancelled) {
             const ct = await ctResp.json()
-            setSchema(ct.schema ?? [])
+            const rawSchema = ct.schema
+            setSchema((typeof rawSchema === 'object' && rawSchema?.fields ? rawSchema.fields : rawSchema) ?? [])
           }
         }
       } finally {
@@ -64,10 +70,11 @@ export function ApprovalDiff({ itemId, contentTypeSlug, onBack, onActionComplete
   const handleApprove = useCallback(async () => {
     setSubmitting(true)
     try {
-      const resp = await agentFetch(`/cms/api/content-items/${itemId}`, authUser.getIdToken, {
+      const token = await authUser.getIdToken()
+      const resp = await fetch(`/agent/api/cms/items/${itemId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workflow_status: 'pending' }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ workflow_status: 'approved' }),
       })
       if (resp.ok) onActionComplete()
     } finally {
@@ -79,9 +86,10 @@ export function ApprovalDiff({ itemId, contentTypeSlug, onBack, onActionComplete
     if (!comment.trim()) return
     setSubmitting(true)
     try {
-      const resp = await agentFetch(`/cms/api/content-items/${itemId}`, authUser.getIdToken, {
+      const token = await authUser.getIdToken()
+      const resp = await fetch(`/agent/api/cms/items/${itemId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ workflow_status: 'changes_requested', workflow_comment: comment.trim() }),
       })
       if (resp.ok) onActionComplete()
@@ -100,7 +108,9 @@ export function ApprovalDiff({ itemId, contentTypeSlug, onBack, onActionComplete
         <button type="button" onClick={onBack} className="rounded p-1 hover:bg-accent transition-colors">
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="text-sm font-medium">{contentTypeSlug}</span>
+        <button type="button" onClick={onBackToList} className="text-sm font-medium hover:underline">
+          {contentTypeName ?? contentTypeSlug}
+        </button>
         <span className="text-xs text-muted-foreground">/ Approval review</span>
 
         <div className="ml-auto flex items-center gap-1.5">
@@ -155,7 +165,8 @@ export function ApprovalDiff({ itemId, contentTypeSlug, onBack, onActionComplete
       )}
 
       <div className="flex flex-col gap-4 px-1">
-        <div className="grid grid-cols-2 gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b pb-1">
+        <div className="grid grid-cols-[8rem_1fr_1fr] gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b pb-1">
+          <span />
           <span>Published (before)</span>
           <span>Current draft (after)</span>
         </div>
@@ -164,15 +175,15 @@ export function ApprovalDiff({ itemId, contentTypeSlug, onBack, onActionComplete
           const after = String(currentData[field.name] ?? '')
           const changed = before !== after
           return (
-            <div key={field.name} className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{field.name}</span>
-              <div className="grid grid-cols-2 gap-2">
-                <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-red-200 bg-red-50 text-red-900' : 'border-border bg-muted/30'}`}>
-                  {before || <span className="italic text-muted-foreground">empty</span>}
-                </div>
-                <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-green-200 bg-green-50 text-green-900' : 'border-border bg-muted/30'}`}>
-                  {after || <span className="italic text-muted-foreground">empty</span>}
-                </div>
+            <div key={field.name} className="grid grid-cols-[8rem_1fr_1fr] items-start gap-3">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2 text-right">
+                {field.name}
+              </label>
+              <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-red-200 bg-red-50 text-red-900' : 'border-border bg-muted/30'}`}>
+                {before || <span className="italic text-muted-foreground">empty</span>}
+              </div>
+              <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-green-200 bg-green-50 text-green-900' : 'border-border bg-muted/30'}`}>
+                {after || <span className="italic text-muted-foreground">empty</span>}
               </div>
             </div>
           )

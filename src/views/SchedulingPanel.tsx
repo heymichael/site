@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Calendar, Clock } from 'lucide-react'
-import { agentFetch } from '@haderach/shared-ui'
-import { useAuthUser } from '../auth/AuthUserContext'
 
 interface Schedule {
   id: string
@@ -11,7 +9,6 @@ interface Schedule {
 }
 
 export function SchedulingPanel() {
-  const authUser = useAuthUser()
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -19,7 +16,7 @@ export function SchedulingPanel() {
     let cancelled = false
     async function load() {
       try {
-        const resp = await agentFetch('/cms/api/schedules?depth=1&sort=-publishAt&limit=50', authUser.getIdToken)
+        const resp = await fetch('/cms/api/schedules?depth=1&sort=-publishAt&limit=50')
         if (!resp.ok || cancelled) return
         const data = await resp.json()
         const docs: Schedule[] = (data.docs ?? []).map((d: Record<string, unknown>) => ({
@@ -39,7 +36,7 @@ export function SchedulingPanel() {
     }
     load()
     return () => { cancelled = true }
-  }, [authUser.getIdToken])
+  }, [])
 
   if (loading) {
     return <div className="p-4 text-sm text-muted-foreground">Loading schedules…</div>

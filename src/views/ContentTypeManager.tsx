@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { ChevronLeft, Lock } from 'lucide-react'
-import { agentFetch } from '@haderach/shared-ui'
 import { useAuthUser } from '../auth/AuthUserContext'
 
 interface FieldSchema {
@@ -33,13 +32,14 @@ export function ContentTypeManager({ contentTypeId, onBack, onCommit }: ContentT
     let cancelled = false
     async function load() {
       try {
-        const resp = await agentFetch(`/cms/api/content-types/${contentTypeId}`, authUser.getIdToken)
+        const resp = await fetch(`/cms/api/content-types/${contentTypeId}`)
         if (!resp.ok || cancelled) return
         const ct = await resp.json()
-        setLabel(ct.label ?? ct.slug ?? '')
+        setLabel(ct.name ?? ct.label ?? ct.slug ?? '')
         setSlug(ct.slug ?? '')
         setStatus(ct.status ?? 'draft')
-        const schema = (ct.schema as FieldSchema[]) ?? []
+        const rawSchema = ct.schema
+        const schema: FieldSchema[] = (typeof rawSchema === 'object' && rawSchema?.fields ? rawSchema.fields : rawSchema) ?? []
         if (ct.status === 'committed') {
           setCommittedFields(schema)
           setProposedFields((ct.proposed_fields as FieldSchema[]) ?? [])
@@ -57,9 +57,10 @@ export function ContentTypeManager({ contentTypeId, onBack, onCommit }: ContentT
 
   const handleCommit = async () => {
     if (!contentTypeId) return
-    const resp = await agentFetch(`/cms/api/content-types/${contentTypeId}`, authUser.getIdToken, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+    const token = await authUser.getIdToken()
+    const resp = await fetch(`/agent/api/cms/content-types/${contentTypeId}/commit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         status: 'committed',
         ...(isExtendMode && {
@@ -96,7 +97,12 @@ export function ContentTypeManager({ contentTypeId, onBack, onCommit }: ContentT
             <button
               type="button"
               onClick={handleCommit}
-              className="rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              disabled={proposedFields.length === 0}
+              className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                proposedFields.length > 0
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'border border-input text-muted-foreground/40 cursor-default'
+              }`}
             >
               Commit
             </button>
@@ -112,13 +118,13 @@ export function ContentTypeManager({ contentTypeId, onBack, onCommit }: ContentT
 
       {!isNew && (
         <div className="flex flex-col gap-1">
-          <div className="flex flex-col gap-1">
+          <div className="flex items-baseline gap-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</span>
-            <div className="text-sm">{label}</div>
+            <span className="text-sm">{label}</span>
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex items-baseline gap-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Slug</span>
-            <div className="text-sm text-muted-foreground">{slug}</div>
+            <span className="text-sm text-muted-foreground">{slug}</span>
           </div>
         </div>
       )}
@@ -145,7 +151,7 @@ export function ContentTypeManager({ contentTypeId, onBack, onCommit }: ContentT
             {isExtendMode ? 'Proposed additions' : 'Schema fields'}
           </span>
           {proposedFields.map((field) => (
-            <div key={field.name} className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+            <div key={field.name} className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2">
               <span className="text-sm font-medium">{field.name}</span>
               <span className="text-xs text-muted-foreground">{field.type}</span>
               {field.required && <span className="text-[10px] text-red-500">required</span>}

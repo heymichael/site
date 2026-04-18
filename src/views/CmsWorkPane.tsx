@@ -16,6 +16,7 @@ interface NavState {
   segment: Segment
   collectionId?: string
   collectionSlug?: string
+  collectionName?: string
   itemId?: string
   contentTypeSlug?: string
   contentTypeId?: string
@@ -25,9 +26,10 @@ interface NavState {
 interface CmsWorkPaneProps {
   isCmsAdmin: boolean
   onModeChange: (mode: CmsMode, ctx: { orgSlug?: string; itemId?: string; contentTypeSlug?: string }) => void
+  refreshKey?: number
 }
 
-export function CmsWorkPane({ isCmsAdmin, onModeChange }: CmsWorkPaneProps) {
+export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPaneProps) {
   const [nav, setNav] = useState<NavState>({ segment: 'collections', subView: 'none' })
 
   const handleSegmentChange = useCallback((seg: Segment) => {
@@ -40,8 +42,8 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange }: CmsWorkPaneProps) {
     onModeChange(modeMap[seg], {})
   }, [onModeChange])
 
-  const handleSelectCollection = useCallback((collectionId: string, slug: string) => {
-    setNav({ segment: 'collections', collectionId, collectionSlug: slug, subView: 'none' })
+  const handleSelectCollection = useCallback((collectionId: string, slug: string, name: string) => {
+    setNav({ segment: 'collections', collectionId, collectionSlug: slug, collectionName: name, subView: 'none' })
     onModeChange('browse', { contentTypeSlug: slug })
   }, [onModeChange])
 
@@ -87,6 +89,11 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange }: CmsWorkPaneProps) {
     }
   }, [nav, onModeChange])
 
+  const handleBackToList = useCallback(() => {
+    setNav((prev) => ({ ...prev, itemId: undefined, subView: 'none' }))
+    onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
+  }, [onModeChange, nav.collectionSlug])
+
   const handleActionComplete = useCallback(() => {
     setNav((prev) => ({ ...prev, itemId: undefined, subView: 'none' }))
     onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
@@ -128,6 +135,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange }: CmsWorkPaneProps) {
           <ItemsList
             collectionId={nav.collectionId}
             collectionSlug={nav.collectionSlug ?? ''}
+            collectionName={nav.collectionName ?? nav.collectionSlug ?? ''}
             onSelect={handleSelectItem}
             onSelectForApproval={handleOpenApproval}
             onNew={handleNewItem}
@@ -138,15 +146,19 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange }: CmsWorkPaneProps) {
           <ItemEditor
             itemId={nav.itemId}
             contentTypeSlug={nav.collectionSlug ?? ''}
+            contentTypeName={nav.collectionName}
             onBack={handleBack}
             onOpenHistory={handleOpenHistory}
+            refreshKey={refreshKey}
           />
         )}
         {nav.segment === 'collections' && nav.subView === 'approval' && nav.itemId && (
           <ApprovalDiff
             itemId={nav.itemId}
             contentTypeSlug={nav.collectionSlug ?? ''}
+            contentTypeName={nav.collectionName}
             onBack={handleBack}
+            onBackToList={handleBackToList}
             onActionComplete={handleActionComplete}
           />
         )}
@@ -154,6 +166,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange }: CmsWorkPaneProps) {
           <VersionHistory
             itemId={nav.itemId}
             contentTypeSlug={nav.collectionSlug ?? ''}
+            contentTypeName={nav.collectionName}
             onBack={handleBack}
             onRestore={handleActionComplete}
           />
