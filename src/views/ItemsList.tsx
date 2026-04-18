@@ -40,7 +40,7 @@ interface ItemsListProps {
   onBack: () => void
 }
 
-export function ItemsList({ collectionId, collectionSlug, collectionName, onSelect, onSelectForApproval, onNew, onBack }: ItemsListProps) {
+export function ItemsList({ collectionId, collectionName, onSelect, onSelectForApproval, onBack }: ItemsListProps) {
   const authUser = useAuthUser()
   const [items, setItems] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)

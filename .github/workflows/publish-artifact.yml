@@ -1,0 +1,101 @@
+name: app-publish-artifact
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish-artifact:
+    name: Build and publish artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone haderach-home for shared-ui
+        run: git clone --depth 1 https://x-access-token:${{ secrets.CROSS_REPO_PAT }}@github.com/heymichael/haderach-home.git ../haderach-home
+
+      - name: Install haderach-home dependencies
+        run: npm install --prefix ../haderach-home
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build runtime artifact
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+        run: npm run build
+
+      - name: Package artifacts
+        run: bash scripts/package-artifacts.sh
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SHA=$(git rev-parse HEAD)
+          RUN="${{ github.run_number }}"
+          echo "semver=${VERSION}+build.${RUN}" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate manifest
+        run: |
+          node scripts/generate-manifest.mjs \
+            --bucket "${{ vars.GCS_ARTIFACT_BUCKET }}" \
+            --sha    "${{ steps.version.outputs.sha }}" \
+            --version "${{ steps.version.outputs.semver }}"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload versioned artifacts to GCS
+        run: |
+          BUCKET="${{ vars.GCS_ARTIFACT_BUCKET }}"
+          SHA="${{ steps.version.outputs.sha }}"
+          PREFIX="gs://${BUCKET}/site/versions/${SHA}"
+
+          gsutil -m cp \
+            artifacts/publish/runtime.tar.gz \
+            artifacts/publish/checksums.txt \
+            artifacts/publish/manifest.json \
+            "${PREFIX}/"
+
+          echo "Uploaded artifacts to ${PREFIX}/"
+
+      - name: Verify upload
+        run: |
+          BUCKET="${{ vars.GCS_ARTIFACT_BUCKET }}"
+          SHA="${{ steps.version.outputs.sha }}"
+          PREFIX="gs://${BUCKET}/site/versions/${SHA}"
+
+          echo "Listing uploaded objects:"
+          gsutil ls "${PREFIX}/"
+
+          echo "Verifying manifest download:"
+          gsutil cat "${PREFIX}/manifest.json" | python3 -m json.tool
