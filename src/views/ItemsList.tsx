@@ -58,12 +58,14 @@ export function ItemsList({ collectionId, collectionSlug, collectionName, onSele
         if (!resp.ok) return
         const data = await resp.json()
         if (cancelled) return
-        const docs: ContentItem[] = (data.docs ?? []).map((d: Record<string, unknown>) => ({
-          id: d.id as string,
-          title: ((d.data as Record<string, unknown>)?.title as string) ?? (d.slug as string) ?? `Item ${d.id}`,
-          workflowStatus: ((d.workflow_status as string) ?? 'draft') as WorkflowState,
-          updatedAt: d.updatedAt as string,
-        }))
+        const docs: ContentItem[] = (data.docs ?? [])
+          .filter((d: Record<string, unknown>) => !(d.data as Record<string, unknown>)?.role)
+          .map((d: Record<string, unknown>) => ({
+            id: d.id as string,
+            title: ((d.data as Record<string, unknown>)?.title as string) ?? (d.slug as string) ?? `Item ${d.id}`,
+            workflowStatus: ((d.workflow_status as string) ?? 'draft') as WorkflowState,
+            updatedAt: d.updatedAt as string,
+          }))
         setItems(docs)
       } finally {
         if (!cancelled) setLoading(false)

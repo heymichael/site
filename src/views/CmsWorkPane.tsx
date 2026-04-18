@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { CollectionsList } from './CollectionsList'
+import { CollectionHome } from './CollectionHome'
 import { ItemsList } from './ItemsList'
 import { ItemEditor } from './ItemEditor'
 import { ApprovalDiff } from './ApprovalDiff'
@@ -10,7 +11,7 @@ import { PermissionsMatrix } from './PermissionsMatrix'
 
 export type CmsMode = 'browse' | 'editing' | 'scheduling' | 'approval' | 'admin' | 'admin-permissions'
 type Segment = 'collections' | 'schedule' | 'admin'
-type SubView = 'none' | 'approval' | 'history' | 'content-type'
+type SubView = 'none' | 'listings' | 'shared-item' | 'approval' | 'history' | 'content-type'
 
 interface NavState {
   segment: Segment
@@ -48,12 +49,17 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPan
   }, [onModeChange])
 
   const handleSelectItem = useCallback((itemId: string) => {
-    setNav((prev) => ({ ...prev, itemId, subView: 'none' }))
+    setNav((prev) => ({ ...prev, itemId, subView: 'listings' }))
+    onModeChange('editing', { itemId, contentTypeSlug: nav.collectionSlug })
+  }, [onModeChange, nav.collectionSlug])
+
+  const handleSelectSharedItem = useCallback((itemId: string) => {
+    setNav((prev) => ({ ...prev, itemId, subView: 'shared-item' }))
     onModeChange('editing', { itemId, contentTypeSlug: nav.collectionSlug })
   }, [onModeChange, nav.collectionSlug])
 
   const handleNewItem = useCallback(() => {
-    setNav((prev) => ({ ...prev, itemId: undefined, subView: 'none' }))
+    setNav((prev) => ({ ...prev, itemId: undefined, subView: 'listings' }))
     onModeChange('editing', { contentTypeSlug: nav.collectionSlug })
   }, [onModeChange, nav.collectionSlug])
 
@@ -71,18 +77,38 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPan
     onModeChange('admin', { contentTypeSlug: nav.collectionSlug })
   }, [onModeChange, nav.collectionSlug])
 
+  const handleSelectListings = useCallback(() => {
+    setNav((prev) => ({ ...prev, subView: 'listings' }))
+  }, [])
+
+  const handleBackToHome = useCallback(() => {
+    setNav((prev) => ({ ...prev, subView: 'none', itemId: undefined }))
+    onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
+  }, [onModeChange, nav.collectionSlug])
+
   const handleBack = useCallback(() => {
-    if (nav.subView !== 'none') {
-      const wasApproval = nav.subView === 'approval'
-      setNav((prev) => ({ ...prev, subView: 'none' }))
-      if (wasApproval) {
+    if (nav.subView === 'history' || nav.subView === 'approval') {
+      const returnView = nav.itemId ? (nav.subView === 'approval' ? 'listings' : 'listings') : 'none'
+      setNav((prev) => ({ ...prev, subView: returnView as SubView }))
+      if (nav.subView === 'approval') {
         onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
       }
       return
     }
-    if (nav.itemId) {
-      setNav((prev) => ({ ...prev, itemId: undefined }))
+    if (nav.subView === 'content-type') {
+      setNav((prev) => ({ ...prev, subView: 'none', contentTypeId: undefined }))
+      return
+    }
+    if (nav.subView === 'shared-item') {
+      setNav((prev) => ({ ...prev, subView: 'none', itemId: undefined }))
       onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
+      return
+    }
+    if (nav.itemId) {
+      setNav((prev) => ({ ...prev, itemId: undefined, subView: 'listings' }))
+      onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
+    } else if (nav.subView === 'listings') {
+      setNav((prev) => ({ ...prev, subView: 'none' }))
     } else if (nav.collectionId) {
       setNav({ segment: 'collections', subView: 'none' })
       onModeChange('browse', {})
@@ -90,12 +116,12 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPan
   }, [nav, onModeChange])
 
   const handleBackToList = useCallback(() => {
-    setNav((prev) => ({ ...prev, itemId: undefined, subView: 'none' }))
+    setNav((prev) => ({ ...prev, itemId: undefined, subView: 'listings' }))
     onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
   }, [onModeChange, nav.collectionSlug])
 
   const handleActionComplete = useCallback(() => {
-    setNav((prev) => ({ ...prev, itemId: undefined, subView: 'none' }))
+    setNav((prev) => ({ ...prev, itemId: undefined, subView: 'listings' }))
     onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
   }, [onModeChange, nav.collectionSlug])
 
@@ -131,7 +157,29 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPan
             onEditContentType={(id) => handleOpenContentType(id)}
           />
         )}
-        {nav.segment === 'collections' && nav.subView === 'none' && nav.collectionId && !nav.itemId && (
+        {nav.segment === 'collections' && nav.subView === 'none' && nav.collectionId && (
+          <CollectionHome
+            collectionId={nav.collectionId}
+            collectionSlug={nav.collectionSlug ?? ''}
+            collectionName={nav.collectionName ?? nav.collectionSlug ?? ''}
+            onBack={handleBack}
+            onSelectListings={handleSelectListings}
+            onSelectItem={handleSelectSharedItem}
+            onSelectForApproval={handleOpenApproval}
+            onEditContentType={(id) => handleOpenContentType(id)}
+          />
+        )}
+        {nav.segment === 'collections' && nav.subView === 'shared-item' && nav.itemId && (
+          <ItemEditor
+            itemId={nav.itemId}
+            contentTypeSlug={nav.collectionSlug ?? ''}
+            contentTypeName={nav.collectionName}
+            onBack={handleBack}
+            onOpenHistory={handleOpenHistory}
+            refreshKey={refreshKey}
+          />
+        )}
+        {nav.segment === 'collections' && nav.subView === 'listings' && nav.collectionId && !nav.itemId && (
           <ItemsList
             collectionId={nav.collectionId}
             collectionSlug={nav.collectionSlug ?? ''}
@@ -139,10 +187,10 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPan
             onSelect={handleSelectItem}
             onSelectForApproval={handleOpenApproval}
             onNew={handleNewItem}
-            onBack={handleBack}
+            onBack={handleBackToHome}
           />
         )}
-        {nav.segment === 'collections' && nav.subView === 'none' && nav.itemId && (
+        {nav.segment === 'collections' && nav.subView === 'listings' && nav.itemId && (
           <ItemEditor
             itemId={nav.itemId}
             contentTypeSlug={nav.collectionSlug ?? ''}
