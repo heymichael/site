@@ -22,6 +22,7 @@ export function App() {
   const [cmsMode, setCmsMode] = useState<CmsMode>('browse')
   const [cmsItemId, setCmsItemId] = useState<string | undefined>()
   const [cmsContentTypeSlug, setCmsContentTypeSlug] = useState<string | undefined>()
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const chatRef = useRef<ChatPanelHandle>(null)
   const paneRef = useRef<PaneLayoutHandle>(null)
@@ -30,6 +31,10 @@ export function App() {
     setCmsMode(mode)
     setCmsItemId(ctx.itemId)
     setCmsContentTypeSlug(ctx.contentTypeSlug)
+  }, [])
+
+  const handleToolResult = useCallback(() => {
+    setRefreshKey((k) => k + 1)
   }, [])
 
   const handlePaneToggle = useCallback((id: PaneId) => {
@@ -83,14 +88,18 @@ export function App() {
                 ...(cmsContentTypeSlug && { contentTypeSlug: cmsContentTypeSlug }),
               }}
               getIdToken={authUser.getIdToken}
+              onToolResult={handleToolResult}
               inputPlaceholder="How can I help you manage content?"
             />
           }
           dataContent={
-            <CmsWorkPane
-              isCmsAdmin={authUser.isCmsAdmin}
-              onModeChange={handleModeChange}
-            />
+            <div className="flex flex-1 min-h-0 flex-col p-2">
+              <CmsWorkPane
+                isCmsAdmin={authUser.isCmsAdmin}
+                onModeChange={handleModeChange}
+                refreshKey={refreshKey}
+              />
+            </div>
           }
         />
       </div>
