@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { ChevronLeft, Save, X, History, ArrowBigRight, Send, FilePlus2 } from 'lucide-react'
 import { useAuthUser } from '../auth/AuthUserContext'
 import { useConfirm } from '../components/ConfirmDialog'
+import { RichTextEditor } from '../components/RichTextEditor'
 
 function ToolbarBtn({ label, onClick, active, alwaysMuted, children }: {
   label: string
@@ -261,7 +262,13 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
               {field.name}
               {field.required && <span className="text-red-500 ml-0.5">*</span>}
             </label>
-            {field.type === 'textarea' ? (
+            {field.type === 'richtext' ? (
+              <RichTextEditor
+                value={(itemData[field.name] as string) ?? ''}
+                onChange={(html) => handleFieldChange(field.name, html)}
+                editable={editable}
+              />
+            ) : field.type === 'textarea' ? (
               editable ? (
                 <textarea
                   value={(itemData[field.name] as string) ?? ''}

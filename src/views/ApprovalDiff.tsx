@@ -179,12 +179,26 @@ export function ApprovalDiff({ itemId, contentTypeSlug, contentTypeName, onBack,
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2 text-right">
                 {field.name}
               </label>
-              <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-red-200 bg-red-50 text-red-900' : 'border-border bg-muted/30'}`}>
-                {before || <span className="italic text-muted-foreground">empty</span>}
-              </div>
-              <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-green-200 bg-green-50 text-green-900' : 'border-border bg-muted/30'}`}>
-                {after || <span className="italic text-muted-foreground">empty</span>}
-              </div>
+              {field.type === 'richtext' ? (
+                <div
+                  className={`rounded-md border px-3 py-2 text-sm prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_p]:my-1 [&_a]:text-primary [&_a]:underline ${changed ? 'border-red-200 bg-red-50 text-red-900' : 'border-border bg-muted/30'}`}
+                  dangerouslySetInnerHTML={{ __html: before || '<span class="italic text-muted-foreground">empty</span>' }}
+                />
+              ) : (
+                <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-red-200 bg-red-50 text-red-900' : 'border-border bg-muted/30'}`}>
+                  {before || <span className="italic text-muted-foreground">empty</span>}
+                </div>
+              )}
+              {field.type === 'richtext' ? (
+                <div
+                  className={`rounded-md border px-3 py-2 text-sm prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_p]:my-1 [&_a]:text-primary [&_a]:underline ${changed ? 'border-green-200 bg-green-50 text-green-900' : 'border-border bg-muted/30'}`}
+                  dangerouslySetInnerHTML={{ __html: after || '<span class="italic text-muted-foreground">empty</span>' }}
+                />
+              ) : (
+                <div className={`rounded-md border px-3 py-2 text-sm ${changed ? 'border-green-200 bg-green-50 text-green-900' : 'border-border bg-muted/30'}`}>
+                  {after || <span className="italic text-muted-foreground">empty</span>}
+                </div>
+              )}
             </div>
           )
         })}
