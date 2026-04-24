@@ -41,6 +41,8 @@ Site app (Firebase Hosting /site/**)
 
 See `agent/docs/architecture.md` for the agent service and CMS proxy endpoint details.
 See `haderach-cms/docs/architecture.md` for the Payload schema and collections.
+Workspace-level Cursor rule coverage is tracked in
+`../haderach-platform/docs/cursor-rule-matrix.md`.
 
 ## Local dev
 
