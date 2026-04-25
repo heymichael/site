@@ -125,6 +125,15 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPan
     onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
   }, [onModeChange, nav.collectionSlug])
 
+  const handleRestoreComplete = useCallback(() => {
+    setNav((prev) => ({ ...prev, subView: 'listings' }))
+    if (nav.itemId) {
+      onModeChange('editing', { itemId: nav.itemId, contentTypeSlug: nav.collectionSlug })
+      return
+    }
+    onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
+  }, [onModeChange, nav.collectionSlug, nav.itemId])
+
   const segmentBtnClass = (seg: Segment) =>
     `rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
       nav.segment === seg
@@ -216,7 +225,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPan
             contentTypeSlug={nav.collectionSlug ?? ''}
             contentTypeName={nav.collectionName}
             onBack={handleBack}
-            onRestore={handleActionComplete}
+            onRestore={handleRestoreComplete}
           />
         )}
         {nav.subView === 'content-type' && (
