@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
-import { ChevronLeft, Save, X, History, ArrowBigRight, Send, FilePlus2, MessageSquare } from 'lucide-react'
+import { ChevronLeft, Save, X, History, ArrowBigRight, Send, Undo, FilePlus2, MessageSquare } from 'lucide-react'
 import { useAuthUser } from '../auth/AuthUserContext'
 import { useConfirm } from '../components/ConfirmDialog'
 import { RichTextEditor } from '../components/RichTextEditor'
@@ -128,6 +128,16 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
     })
   }, [])
 
+  const refreshItem = useCallback(async () => {
+    const updated = await fetch(`/cms/api/content-items/${itemId}?depth=1`)
+    if (updated.ok) {
+      const data = await updated.json()
+      setItem(data)
+      setDirty(false)
+      setSaved(false)
+    }
+  }, [itemId])
+
   const handleSave = useCallback(async () => {
     if (!item || !dirty) return
     const data = (item.data as Record<string, unknown>) ?? {}
@@ -226,17 +236,34 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
         body: JSON.stringify({ workflow_status: 'draft' }),
       })
       if (!resp.ok) throw new Error(`New version failed: ${resp.status}`)
-      const updated = await fetch(`/cms/api/content-items/${itemId}?depth=1`)
-      if (updated.ok) {
-        const data = await updated.json()
-        setItem(data)
-        setDirty(false)
-        setSaved(false)
-      }
+      await refreshItem()
     } catch (e) {
       console.error('New version failed:', e)
     }
-  }, [authUser, itemId])
+  }, [authUser, itemId, refreshItem])
+
+  const handleDeactivate = useCallback(async () => {
+    const ok = await confirm({
+      title: 'Deactivate live item?',
+      description: 'This will delist the item from the public site immediately and return it to Draft.',
+      confirmLabel: 'Deactivate',
+      cancelLabel: 'Keep live',
+      variant: 'destructive',
+    })
+    if (!ok) return
+    try {
+      const token = await authUser.getIdToken()
+      const resp = await fetch(`/agent/api/cms/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ workflow_status: 'draft' }),
+      })
+      if (!resp.ok) throw new Error(`Deactivate failed: ${resp.status}`)
+      await refreshItem()
+    } catch (e) {
+      console.error('Deactivate failed:', e)
+    }
+  }, [confirm, authUser, itemId, refreshItem])
 
   if (loading) {
     return <div className="p-4 text-sm text-muted-foreground">Loading item...</div>
@@ -252,6 +279,7 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
   const editable = workflowStatus === 'draft' || workflowStatus === 'changes_requested'
   const canSubmit = editable
   const canPublish = workflowStatus === 'approved'
+  const canDeactivate = workflowStatus === 'live'
   const canNewVersion = workflowStatus === 'live'
   const workflowComment = (item.workflow_comment as string) ?? ''
 
@@ -283,6 +311,9 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
           </ToolbarBtn>
           <ToolbarBtn label="Publish" onClick={canPublish ? handlePublish : undefined} active={canPublish}>
             <Send className="h-4 w-4" />
+          </ToolbarBtn>
+          <ToolbarBtn label="Deactivate" onClick={canDeactivate ? handleDeactivate : undefined} active={canDeactivate}>
+            <Undo className="h-4 w-4" />
           </ToolbarBtn>
           <ToolbarBtn label="New version" onClick={canNewVersion ? handleNewVersion : undefined} active={canNewVersion}>
             <FilePlus2 className="h-4 w-4" />
