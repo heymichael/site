@@ -1,15 +1,16 @@
 ---
-description: Service-oriented data access — all data through agent or CMS API
-alwaysApply: true
+description: Service-oriented data access — canonical rule plus site-specific API split
+alwaysApply: false
 ---
 
 # Service-Oriented Data Access
 
-This frontend must access data through service APIs, not directly through any database or storage backend.
+Follow the canonical rule defined in
+`../haderach-platform/.cursor/rules/service-oriented-data-access.mdc`.
 
-- **Read content** via the Payload CMS REST API at `/cms/api/**` (proxied to `localhost:3000` in dev, served by `cms-api` Cloud Run in prod).
-- **Write content / workflow / chat** via the agent service at `/agent/api/**` (proxied to `localhost:8080` in dev, served by `agent-api` Cloud Run in prod). The agent owns all mutating operations (create/update content items, transition workflow status, etc.) so they can be governed by RBAC, audit logging, and tool-call validation.
-- Use the `agentFetch` utility (or equivalent authenticated fetch wrapper) from `@haderach/shared-ui` for authenticated calls.
-- Do not import Firebase client SDK (`getFirestore`, `getDoc`, `collection`, `onSnapshot`, etc.) for data access. Firebase Auth SDK for authentication is fine.
+## Site-specific API split
 
-Follow the canonical rule defined in `../haderach-platform/.cursor/rules/service-oriented-data-access.mdc`.
+- **Read content** via the Payload CMS REST API at `/cms/api/**`.
+- **Write content / workflow / chat** via the agent service at
+  `/agent/api/**`, so mutating operations stay behind RBAC, audit logging, and
+  workflow validation.

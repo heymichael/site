@@ -1,6 +1,6 @@
 ---
 description: Local dev testing procedure — pointer to platform rule
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Local Dev Testing

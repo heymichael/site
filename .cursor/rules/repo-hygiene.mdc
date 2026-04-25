@@ -5,14 +5,18 @@ alwaysApply: true
 
 # App Boundary Rule
 
-This repository is the CMS-driven public site app, integrated into the haderach platform control plane.
+This repository is the operator-facing CMS workflow SPA for the Haderach
+platform. It is not the public marketing site.
 
 - Keep strict separation of concerns:
-  - This repo owns the site SPA implementation, CI patterns, and artifact publish contracts.
-  - Platform orchestration, promotion, and cross-app routing checks remain outside this repo.
-  - Content collections and the Payload CMS service live in `../haderach-cms/`.
-  - Agent CMS proxy endpoints and tool handlers live in `../agent/service/`.
-- Keep app logic and app tests in this repository; do not add platform orchestration or backend logic here.
+  - This repo owns the site SPA implementation, CI patterns, and artifact
+    publish contracts.
+  - The Payload CMS service and content schema live in `../haderach-cms/`.
+  - The agent-owned CMS workflow handlers live in `../agent/service/`.
+  - Platform orchestration, promotion, and cross-app routing checks remain
+    outside this repo.
+- Keep site UI logic and app tests in this repository; do not add platform
+  orchestration or backend service code here.
 - Keep naming kebab-case for repo/path conventions unless language-specific rules require otherwise.
 - Prefer explicit docs and small config contracts over heavy scripts or premature automation.
 - Use or update docs when behavior/contracts change:

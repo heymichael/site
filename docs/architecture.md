@@ -6,6 +6,11 @@ The `site` app is the operator-facing CMS interface for the Haderach platform. I
 
 It is the visible client for content collections: editors browse and edit content items, approvers review diffs, publishers ship them live. All mutations flow through the agent service so they can be governed by RBAC, audit logging, and tool-call validation. Reads come straight from Payload's REST API.
 
+## Cursor Rules
+
+Workspace-level Cursor rule coverage and `alwaysApply` settings are tracked in
+`../haderach-platform/docs/cursor-rule-matrix.md`.
+
 ## Repo Layout
 
 ```text
