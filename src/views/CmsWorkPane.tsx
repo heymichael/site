@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { CollectionsList } from './CollectionsList'
 import { CollectionHome } from './CollectionHome'
 import { ItemsList } from './ItemsList'
@@ -26,12 +26,24 @@ interface NavState {
 
 interface CmsWorkPaneProps {
   isCmsAdmin: boolean
-  onModeChange: (mode: CmsMode, ctx: { orgSlug?: string; itemId?: string; contentTypeSlug?: string }) => void
+  onModeChange: (mode: CmsMode, ctx: { orgSlug?: string; itemId?: string; contentTypeSlug?: string; contentTypeId?: string }) => void
   refreshKey?: number
+  navigateToCollections?: number
 }
 
-export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPaneProps) {
+export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCollections }: CmsWorkPaneProps) {
   const [nav, setNav] = useState<NavState>({ segment: 'collections', subView: 'none' })
+
+  const prevNavKeyRef = useRef(navigateToCollections)
+  useEffect(() => {
+    if (navigateToCollections !== prevNavKeyRef.current) {
+      prevNavKeyRef.current = navigateToCollections
+      if (navigateToCollections && navigateToCollections > 0) {
+        setNav({ segment: 'collections', subView: 'none' })
+        onModeChange('browse', {})
+      }
+    }
+  }, [navigateToCollections, onModeChange])
 
   const handleSegmentChange = useCallback((seg: Segment) => {
     setNav({ segment: seg, subView: 'none' })
@@ -74,7 +86,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPan
 
   const handleOpenContentType = useCallback((contentTypeId?: string) => {
     setNav((prev) => ({ ...prev, contentTypeId, subView: 'content-type' }))
-    onModeChange('admin', { contentTypeSlug: nav.collectionSlug })
+    onModeChange('admin', { contentTypeSlug: nav.collectionSlug, contentTypeId })
   }, [onModeChange, nav.collectionSlug])
 
   const handleSelectListings = useCallback(() => {
@@ -124,6 +136,11 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPan
     setNav((prev) => ({ ...prev, itemId: undefined, subView: 'listings' }))
     onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
   }, [onModeChange, nav.collectionSlug])
+
+  const handleContentTypeDeleted = useCallback(() => {
+    setNav({ segment: 'collections', subView: 'none' })
+    onModeChange('browse', {})
+  }, [onModeChange])
 
   const handleRestoreComplete = useCallback(() => {
     setNav((prev) => ({ ...prev, subView: 'listings' }))
@@ -233,6 +250,8 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey }: CmsWorkPan
             contentTypeId={nav.contentTypeId}
             onBack={handleBack}
             onCommit={handleActionComplete}
+            onDelete={handleContentTypeDeleted}
+            refreshKey={refreshKey}
           />
         )}
 

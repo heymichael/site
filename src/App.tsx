@@ -22,19 +22,29 @@ export function App() {
   const [cmsMode, setCmsMode] = useState<CmsMode>('browse')
   const [cmsItemId, setCmsItemId] = useState<string | undefined>()
   const [cmsContentTypeSlug, setCmsContentTypeSlug] = useState<string | undefined>()
+  const [cmsContentTypeId, setCmsContentTypeId] = useState<string | undefined>()
   const [refreshKey, setRefreshKey] = useState(0)
+  const [navToCollectionsKey, setNavToCollectionsKey] = useState(0)
 
   const chatRef = useRef<ChatPanelHandle>(null)
   const paneRef = useRef<PaneLayoutHandle>(null)
 
-  const handleModeChange = useCallback((mode: CmsMode, ctx: { orgSlug?: string; itemId?: string; contentTypeSlug?: string }) => {
+  const handleModeChange = useCallback((mode: CmsMode, ctx: { orgSlug?: string; itemId?: string; contentTypeSlug?: string; contentTypeId?: string }) => {
     setCmsMode(mode)
     setCmsItemId(ctx.itemId)
     setCmsContentTypeSlug(ctx.contentTypeSlug)
+    setCmsContentTypeId(ctx.contentTypeId)
   }, [])
 
-  const handleToolResult = useCallback(() => {
+  const handleToolResult = useCallback((toolNames: string[]) => {
     setRefreshKey((k) => k + 1)
+    // Navigate back to collections after creating a content type
+    if (toolNames.includes('cms_create_content_type')) {
+      setCmsMode('browse')
+      setCmsItemId(undefined)
+      setCmsContentTypeSlug(undefined)
+      setNavToCollectionsKey((k) => k + 1)
+    }
   }, [])
 
   const handlePaneToggle = useCallback((id: PaneId) => {
@@ -86,6 +96,7 @@ export function App() {
                 mode: cmsMode,
                 ...(cmsItemId && { itemId: cmsItemId }),
                 ...(cmsContentTypeSlug && { contentTypeSlug: cmsContentTypeSlug }),
+                ...(cmsContentTypeId && { contentTypeId: cmsContentTypeId }),
               }}
               getIdToken={authUser.getIdToken}
               onToolResult={handleToolResult}
@@ -98,6 +109,7 @@ export function App() {
                 isCmsAdmin={authUser.isCmsAdmin}
                 onModeChange={handleModeChange}
                 refreshKey={refreshKey}
+                navigateToCollections={navToCollectionsKey}
               />
             </div>
           }
