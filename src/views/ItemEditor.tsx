@@ -58,8 +58,8 @@ interface FieldSchema {
   name: string
   type: string
   required: boolean
-  ui: 'inline-form' | 'chat'
   guidelines?: string
+  options?: string[]
 }
 
 interface SharedBlockDef {

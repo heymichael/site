@@ -6,7 +6,7 @@ import { renderContentToHtml } from '../components/tiptapConfig'
 interface FieldSchema {
   name: string
   type: string
-  ui: 'inline-form' | 'chat'
+  guidelines?: string
 }
 
 interface SharedBlockDef {

@@ -111,6 +111,7 @@ Browser (site SPA at /site/)
 | `PATCH /agent/api/cms/items/:id` | `ItemEditor`, `ApprovalDiff` | Save edits, transition workflow status, request changes, etc. |
 | `POST /agent/api/cms/items/:id/versions/:versionId/restore` | `VersionHistory` | Restore a prior version as the current draft |
 | `POST /agent/api/cms/content-types/:id/commit` | `ContentTypeManager` | Commit a draft content type (additive-only thereafter) |
+| `DELETE /agent/api/cms/content-types/:id` | `ContentTypeManager` | Delete a draft content type (rejected for committed types) |
 | `GET /agent/api/cms/items/:id/versions` | `VersionHistory`, `ApprovalDiff` | List all versions of an item (auth required because versions can include draft state) |
 | `POST/PATCH/DELETE /cms/api/cms-roles[/:id]` | `PermissionsMatrix` | Assign/revoke CMS roles (admin-only — currently calls Payload directly; see Tech Debt) |
 
