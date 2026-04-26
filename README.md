@@ -67,12 +67,15 @@ See `haderach-platform/.cursor/rules/local-dev-testing.mdc` for the full local d
 draft → needs_approval → approved → live
               ↘ changes_requested → (editor edits) → needs_approval
                                     approved → scheduled → live
+                                                    live → (Deactivate) → draft
 ```
 
 - **Editor** submits via the Submit button (ArrowBigRight icon) or agent chat
 - **Approver** reviews the diff screen; Approve or Request Changes
 - **Publisher** publishes approved items via the Publish button (Send/paper-plane icon)
-- **Live items** are locked; use "New Version" (FilePlus2 icon) to clone back to draft for editing
+- **Live items** can be:
+  - **Deactivated** (Undo icon) — removes from public API and returns to draft for editing
+  - **Cloned** via "New Version" (FilePlus2 icon) — creates editable draft while keeping original live
 
 ## Shared content blocks
 
