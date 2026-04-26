@@ -105,7 +105,7 @@ export function CollectionsList({ onSelect, onNewContentType, onEditContentType 
             role="button"
             tabIndex={0}
             onClick={() => ct.status === 'committed' ? onSelect(ct.id, ct.slug, ct.label) : onEditContentType?.(ct.id)}
-            onKeyDown={(e) => { if (e.key === 'Enter') ct.status === 'committed' ? onSelect(ct.id, ct.slug, ct.label) : onEditContentType?.(ct.id) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { if (ct.status === 'committed') onSelect(ct.id, ct.slug, ct.label); else onEditContentType?.(ct.id) } }}
             className={`flex items-center justify-between rounded-lg border px-3 py-2.5 text-left hover:bg-accent transition-colors group cursor-pointer ${SCHEMA_STATUS_COLORS[ct.status]}`}
           >
             <span className="text-sm font-medium">{ct.label}</span>

@@ -39,8 +39,10 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
     if (navigateToCollections !== prevNavKeyRef.current) {
       prevNavKeyRef.current = navigateToCollections
       if (navigateToCollections && navigateToCollections > 0) {
-        setNav({ segment: 'collections', subView: 'none' })
-        onModeChange('browse', {})
+        queueMicrotask(() => {
+          setNav({ segment: 'collections', subView: 'none' })
+          onModeChange('browse', {})
+        })
       }
     }
   }, [navigateToCollections, onModeChange])
