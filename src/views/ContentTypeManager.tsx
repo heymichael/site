@@ -6,8 +6,8 @@ interface FieldSchema {
   name: string
   type: string
   required: boolean
-  ui: 'inline-form' | 'chat'
   guidelines?: string
+  options?: string[]
 }
 
 interface ContentTypeManagerProps {
@@ -137,9 +137,6 @@ export function ContentTypeManager({ contentTypeId, onBack, onCommit }: ContentT
               <Lock className="h-3 w-3 text-muted-foreground shrink-0" />
               <span className="text-sm font-medium">{field.name}</span>
               <span className="text-xs text-muted-foreground">{field.type}</span>
-              <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-medium ${field.ui === 'chat' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}`}>
-                {field.ui}
-              </span>
             </div>
           ))}
         </div>
@@ -155,9 +152,6 @@ export function ContentTypeManager({ contentTypeId, onBack, onCommit }: ContentT
               <span className="text-sm font-medium">{field.name}</span>
               <span className="text-xs text-muted-foreground">{field.type}</span>
               {field.required && <span className="text-[10px] text-red-500">required</span>}
-              <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-medium ${field.ui === 'chat' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}`}>
-                {field.ui}
-              </span>
             </div>
           ))}
         </div>
