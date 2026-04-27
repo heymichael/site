@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
-import { ChevronLeft, Save, X, History, ArrowBigRight, Send, Undo, FilePlus2, MessageSquare } from 'lucide-react'
+import { ChevronLeft, Save, X, History, ArrowBigRight, Send, Undo, FilePlus2, MessageSquare, Trash2, EyeOff } from 'lucide-react'
 import { useAuthUser } from '../auth/AuthUserContext'
 import { useConfirm } from '../components/ConfirmDialog'
 import { RichTextEditor } from '../components/RichTextEditor'
 import { isContentEmpty } from '../components/tiptapConfig'
 import type { JSONContent } from '@tiptap/react'
 
-function ToolbarBtn({ label, onClick, active, alwaysMuted, children }: {
+function ToolbarBtn({ label, onClick, active, alwaysMuted, toggledOn, children }: {
   label: string
   onClick?: () => void
   active?: boolean
   alwaysMuted?: boolean
+  toggledOn?: boolean
   children: ReactNode
 }) {
   return (
@@ -19,12 +20,14 @@ function ToolbarBtn({ label, onClick, active, alwaysMuted, children }: {
         type="button"
         aria-label={label}
         onClick={active ? onClick : undefined}
-        className={`rounded-md border border-input p-1.5 transition-colors ${
-          alwaysMuted
-            ? 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            : active
-              ? 'text-primary hover:bg-accent hover:text-accent-foreground'
-              : 'text-muted-foreground/40 cursor-default'
+        className={`rounded-md border p-1.5 transition-colors ${
+          toggledOn
+            ? 'border-primary bg-primary text-primary-foreground hover:opacity-90'
+            : alwaysMuted
+              ? 'border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              : active
+                ? 'border-input text-primary hover:bg-accent hover:text-accent-foreground'
+                : 'border-input text-muted-foreground/40 cursor-default'
         }`}
       >
         {children}
@@ -265,6 +268,44 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
     }
   }, [confirm, authUser, itemId, refreshItem])
 
+  const handleDelete = useCallback(async () => {
+    const ok = await confirm({
+      title: 'Delete this item?',
+      description: 'This action cannot be undone. The item and all its versions will be permanently deleted.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive',
+    })
+    if (!ok) return
+    try {
+      const token = await authUser.getIdToken()
+      const resp = await fetch(`/agent/api/cms/items/${itemId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!resp.ok) throw new Error(`Delete failed: ${resp.status}`)
+      onBack()
+    } catch (e) {
+      console.error('Delete failed:', e)
+    }
+  }, [confirm, authUser, itemId, onBack])
+
+  const handleTogglePreviewHidden = useCallback(async () => {
+    const currentlyHidden = (item?.preview_hidden as boolean) ?? false
+    try {
+      const token = await authUser.getIdToken()
+      const resp = await fetch(`/agent/api/cms/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ preview_hidden: !currentlyHidden }),
+      })
+      if (!resp.ok) throw new Error(`Toggle preview hidden failed: ${resp.status}`)
+      await refreshItem()
+    } catch (e) {
+      console.error('Toggle preview hidden failed:', e)
+    }
+  }, [item, authUser, itemId, refreshItem])
+
   if (loading) {
     return <div className="p-4 text-sm text-muted-foreground">Loading item...</div>
   }
@@ -281,6 +322,9 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
   const canPublish = workflowStatus === 'approved'
   const canDeactivate = workflowStatus === 'live'
   const canNewVersion = workflowStatus === 'live'
+  const canDelete = workflowStatus !== 'live'
+  const canTogglePreviewHidden = workflowStatus === 'draft'
+  const previewHidden = (item.preview_hidden as boolean) ?? false
   const workflowComment = (item.workflow_comment as string) ?? ''
 
   const sharedBlockDef = itemRole
@@ -320,6 +364,12 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
           </ToolbarBtn>
           <ToolbarBtn label="Version history" onClick={onOpenHistory} active>
             <History className="h-4 w-4" />
+          </ToolbarBtn>
+          <ToolbarBtn label={previewHidden ? "Show in preview" : "Hide from preview"} onClick={canTogglePreviewHidden ? handleTogglePreviewHidden : undefined} active={canTogglePreviewHidden} toggledOn={previewHidden}>
+            <EyeOff className="h-4 w-4" />
+          </ToolbarBtn>
+          <ToolbarBtn label="Delete item" onClick={canDelete ? handleDelete : undefined} active={canDelete}>
+            <Trash2 className="h-4 w-4" />
           </ToolbarBtn>
           <ToolbarBtn label="Close" onClick={handleClose} active alwaysMuted>
             <X className="h-4 w-4" />

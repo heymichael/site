@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, FileText, List, Settings } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, Eye, FileText, List, Settings } from 'lucide-react'
+import { useAuthUser } from '../auth/AuthUserContext'
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-700',
@@ -45,6 +46,7 @@ interface CollectionHomeProps {
 
 export function CollectionHome({
   collectionId,
+  collectionSlug,
   collectionName,
   onBack,
   onSelectListings,
@@ -52,9 +54,29 @@ export function CollectionHome({
   onSelectForApproval,
   onEditContentType,
 }: CollectionHomeProps) {
+  const authUser = useAuthUser()
   const [sharedBlocks, setSharedBlocks] = useState<SharedBlockItem[]>([])
   const [itemCount, setItemCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [previewLoading, setPreviewLoading] = useState(false)
+
+  const handlePreview = useCallback(async () => {
+    setPreviewLoading(true)
+    try {
+      const token = await authUser.getIdToken()
+      const resp = await fetch('/cms/api/preview-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ org: 'haderach', collection: collectionSlug }),
+      })
+      if (resp.ok) {
+        const { preview_url } = await resp.json()
+        window.open(preview_url, '_blank')
+      }
+    } finally {
+      setPreviewLoading(false)
+    }
+  }, [collectionSlug, authUser])
 
   useEffect(() => {
     let cancelled = false
@@ -115,16 +137,27 @@ export function CollectionHome({
           <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="text-sm font-medium">{collectionName}</span>
-        {onEditContentType && (
+        <div className="ml-auto flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => onEditContentType(collectionId)}
-            className="ml-auto rounded-md border border-input p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-            title="Manage content type"
+            onClick={handlePreview}
+            disabled={previewLoading}
+            className="rounded-md border border-input p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50"
+            title="Preview collection"
           >
-            <Settings className="h-4 w-4" />
+            <Eye className="h-4 w-4" />
           </button>
-        )}
+          {onEditContentType && (
+            <button
+              type="button"
+              onClick={() => onEditContentType(collectionId)}
+              className="rounded-md border border-input p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              title="Manage content type"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-1">
