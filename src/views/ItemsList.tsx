@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ChevronLeft, Plus } from 'lucide-react'
+import { ChevronLeft, Plus, EyeOff } from 'lucide-react'
 import { useAuthUser } from '../auth/AuthUserContext'
 
 const WORKFLOW_STATES = ['draft', 'needs_approval', 'changes_requested', 'approved', 'scheduled', 'live'] as const
@@ -27,6 +27,7 @@ interface ContentItem {
   id: string
   title: string
   workflowStatus: WorkflowState
+  previewHidden: boolean
   updatedAt: string
 }
 
@@ -64,6 +65,7 @@ export function ItemsList({ collectionId, collectionName, onSelect, onSelectForA
             id: d.id as string,
             title: ((d.data as Record<string, unknown>)?.title as string) ?? (d.slug as string) ?? `Item ${d.id}`,
             workflowStatus: ((d.workflow_status as string) ?? 'draft') as WorkflowState,
+            previewHidden: (d.preview_hidden as boolean) ?? false,
             updatedAt: d.updatedAt as string,
           }))
         setItems(docs)
@@ -187,9 +189,16 @@ export function ItemsList({ collectionId, collectionName, onSelect, onSelectForA
               className="flex flex-1 items-center justify-between text-left"
             >
               <span className="text-sm font-medium">{item.title}</span>
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATE_COLORS[item.workflowStatus]}`}>
-                {STATE_LABELS[item.workflowStatus]}
-              </span>
+              <div className="flex items-center gap-1.5">
+                {item.previewHidden && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded bg-primary" title="Hidden from preview">
+                    <EyeOff className="h-3 w-3 text-primary-foreground" />
+                  </span>
+                )}
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATE_COLORS[item.workflowStatus]}`}>
+                  {STATE_LABELS[item.workflowStatus]}
+                </span>
+              </div>
             </button>
           </div>
         ))}
