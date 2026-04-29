@@ -5,16 +5,12 @@ import { ItemsList } from './ItemsList'
 import { ItemEditor } from './ItemEditor'
 import { ApprovalDiff } from './ApprovalDiff'
 import { VersionHistory } from './VersionHistory'
-import { SchedulingPanel } from './SchedulingPanel'
 import { ContentTypeManager } from './ContentTypeManager'
-import { PermissionsMatrix } from './PermissionsMatrix'
 
 export type CmsMode = 'browse' | 'editing' | 'scheduling' | 'approval' | 'admin' | 'admin-permissions'
-type Segment = 'collections' | 'schedule' | 'admin'
 type SubView = 'none' | 'listings' | 'shared-item' | 'approval' | 'history' | 'content-type'
 
 interface NavState {
-  segment: Segment
   collectionId?: string
   collectionSlug?: string
   collectionName?: string
@@ -31,8 +27,8 @@ interface CmsWorkPaneProps {
   navigateToCollections?: number
 }
 
-export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCollections }: CmsWorkPaneProps) {
-  const [nav, setNav] = useState<NavState>({ segment: 'collections', subView: 'none' })
+export function CmsWorkPane({ onModeChange, refreshKey, navigateToCollections }: CmsWorkPaneProps) {
+  const [nav, setNav] = useState<NavState>({ subView: 'none' })
 
   const prevNavKeyRef = useRef(navigateToCollections)
   useEffect(() => {
@@ -40,25 +36,15 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
       prevNavKeyRef.current = navigateToCollections
       if (navigateToCollections && navigateToCollections > 0) {
         queueMicrotask(() => {
-          setNav({ segment: 'collections', subView: 'none' })
+          setNav({ subView: 'none' })
           onModeChange('browse', {})
         })
       }
     }
   }, [navigateToCollections, onModeChange])
 
-  const handleSegmentChange = useCallback((seg: Segment) => {
-    setNav({ segment: seg, subView: 'none' })
-    const modeMap: Record<Segment, CmsMode> = {
-      collections: 'browse',
-      schedule: 'scheduling',
-      admin: 'admin-permissions',
-    }
-    onModeChange(modeMap[seg], {})
-  }, [onModeChange])
-
   const handleSelectCollection = useCallback((collectionId: string, slug: string, name: string) => {
-    setNav({ segment: 'collections', collectionId, collectionSlug: slug, collectionName: name, subView: 'none' })
+    setNav({ collectionId, collectionSlug: slug, collectionName: name, subView: 'none' })
     onModeChange('browse', { contentTypeSlug: slug })
   }, [onModeChange])
 
@@ -102,7 +88,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
 
   const handleBack = useCallback(() => {
     if (nav.subView === 'history' || nav.subView === 'approval') {
-      const returnView = nav.itemId ? (nav.subView === 'approval' ? 'listings' : 'listings') : 'none'
+      const returnView = nav.itemId ? 'listings' : 'none'
       setNav((prev) => ({ ...prev, subView: returnView as SubView }))
       if (nav.subView === 'approval') {
         onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
@@ -124,7 +110,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
     } else if (nav.subView === 'listings') {
       setNav((prev) => ({ ...prev, subView: 'none' }))
     } else if (nav.collectionId) {
-      setNav({ segment: 'collections', subView: 'none' })
+      setNav({ subView: 'none' })
       onModeChange('browse', {})
     }
   }, [nav, onModeChange])
@@ -140,7 +126,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
   }, [onModeChange, nav.collectionSlug])
 
   const handleContentTypeDeleted = useCallback(() => {
-    setNav({ segment: 'collections', subView: 'none' })
+    setNav({ subView: 'none' })
     onModeChange('browse', {})
   }, [onModeChange])
 
@@ -153,39 +139,17 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
     onModeChange('browse', { contentTypeSlug: nav.collectionSlug })
   }, [onModeChange, nav.collectionSlug, nav.itemId])
 
-  const segmentBtnClass = (seg: Segment) =>
-    `rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-      nav.segment === seg
-        ? 'bg-primary text-primary-foreground'
-        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-    }`
-
   return (
     <div className="flex flex-1 min-h-0 flex-col rounded-xl border border-border bg-card text-card-foreground shadow-sm">
-      <div className="flex items-center gap-1 border-b px-3 py-2">
-        <button type="button" onClick={() => handleSegmentChange('collections')} className={segmentBtnClass('collections')}>
-          Collections
-        </button>
-        <button type="button" onClick={() => handleSegmentChange('schedule')} className={segmentBtnClass('schedule')}>
-          Schedule
-        </button>
-        {isCmsAdmin && (
-          <button type="button" onClick={() => handleSegmentChange('admin')} className={segmentBtnClass('admin')}>
-            Admin
-          </button>
-        )}
-      </div>
-
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {/* Collections segment */}
-        {nav.segment === 'collections' && nav.subView === 'none' && !nav.collectionId && (
+        {nav.subView === 'none' && !nav.collectionId && (
           <CollectionsList
             onSelect={handleSelectCollection}
             onNewContentType={() => handleOpenContentType()}
             onEditContentType={(id) => handleOpenContentType(id)}
           />
         )}
-        {nav.segment === 'collections' && nav.subView === 'none' && nav.collectionId && (
+        {nav.subView === 'none' && nav.collectionId && (
           <CollectionHome
             collectionId={nav.collectionId}
             collectionSlug={nav.collectionSlug ?? ''}
@@ -197,7 +161,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
             onEditContentType={(id) => handleOpenContentType(id)}
           />
         )}
-        {nav.segment === 'collections' && nav.subView === 'shared-item' && nav.itemId && (
+        {nav.subView === 'shared-item' && nav.itemId && (
           <ItemEditor
             itemId={nav.itemId}
             contentTypeSlug={nav.collectionSlug ?? ''}
@@ -207,7 +171,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
             refreshKey={refreshKey}
           />
         )}
-        {nav.segment === 'collections' && nav.subView === 'listings' && nav.collectionId && !nav.itemId && (
+        {nav.subView === 'listings' && nav.collectionId && !nav.itemId && (
           <ItemsList
             collectionId={nav.collectionId}
             collectionSlug={nav.collectionSlug ?? ''}
@@ -218,7 +182,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
             onBack={handleBackToHome}
           />
         )}
-        {nav.segment === 'collections' && nav.subView === 'listings' && nav.itemId && (
+        {nav.subView === 'listings' && nav.itemId && (
           <ItemEditor
             itemId={nav.itemId}
             contentTypeSlug={nav.collectionSlug ?? ''}
@@ -228,7 +192,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
             refreshKey={refreshKey}
           />
         )}
-        {nav.segment === 'collections' && nav.subView === 'approval' && nav.itemId && (
+        {nav.subView === 'approval' && nav.itemId && (
           <ApprovalDiff
             itemId={nav.itemId}
             contentTypeSlug={nav.collectionSlug ?? ''}
@@ -238,7 +202,7 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
             onActionComplete={handleActionComplete}
           />
         )}
-        {nav.segment === 'collections' && nav.subView === 'history' && nav.itemId && (
+        {nav.subView === 'history' && nav.itemId && (
           <VersionHistory
             itemId={nav.itemId}
             contentTypeSlug={nav.collectionSlug ?? ''}
@@ -255,16 +219,6 @@ export function CmsWorkPane({ isCmsAdmin, onModeChange, refreshKey, navigateToCo
             onDelete={handleContentTypeDeleted}
             refreshKey={refreshKey}
           />
-        )}
-
-        {/* Schedule segment */}
-        {nav.segment === 'schedule' && nav.subView === 'none' && (
-          <SchedulingPanel />
-        )}
-
-        {/* Admin segment */}
-        {nav.segment === 'admin' && nav.subView === 'none' && (
-          <PermissionsMatrix />
         )}
       </div>
     </div>
