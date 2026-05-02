@@ -77,6 +77,10 @@ export default defineConfig({
         // (basePath: '/cms' in haderach-cms/next.config.ts). Matches the
         // production Firebase Hosting `/cms/api/**` rewrite to cms-api Cloud Run.
       },
+      '/media/api': {
+        target: 'http://localhost:8000',
+        rewrite: (path) => path.replace(/^\/media\/api/, ''),
+      },
     },
   },
 })
