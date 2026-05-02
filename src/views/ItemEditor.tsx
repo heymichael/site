@@ -3,6 +3,8 @@ import { ChevronLeft, Save, X, History, ArrowBigRight, Send, Undo, FilePlus2, Me
 import { useAuthUser } from '../auth/AuthUserContext'
 import { useConfirm } from '../components/ConfirmDialog'
 import { RichTextEditor } from '../components/RichTextEditor'
+import { ImageFieldEditor } from '../components/ImageFieldEditor'
+import { MediaPickerModal } from '../components/MediaPickerModal'
 import { isContentEmpty } from '../components/tiptapConfig'
 import type { JSONContent } from '@tiptap/react'
 
@@ -91,6 +93,7 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
   const [dirty, setDirty] = useState(false)
   const [, setSaved] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set())
+  const [pickerField, setPickerField] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -423,6 +426,15 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
                         {(itemData[field.name] as string) ?? ''}
                       </div>
                     )
+                  ) : field.type === 'image' ? (
+                    <ImageFieldEditor
+                      value={(itemData[field.name] as string | null) ?? null}
+                      onChange={(assetId) => handleFieldChange(field.name, assetId)}
+                      editable={editable}
+                      required={field.required}
+                      hasError={hasError}
+                      onOpenPicker={() => setPickerField(field.name)}
+                    />
                   ) : (
                     editable ? (
                       <input
@@ -448,6 +460,17 @@ export function ItemEditor({ itemId, contentTypeSlug, contentTypeName, onBack, o
           </>
         )}
       </div>
+
+      <MediaPickerModal
+        open={pickerField !== null}
+        onClose={() => setPickerField(null)}
+        onSelect={(assetId) => {
+          if (pickerField) {
+            handleFieldChange(pickerField, assetId)
+          }
+          setPickerField(null)
+        }}
+      />
     </div>
   )
 }
